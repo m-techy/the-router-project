@@ -89,6 +89,14 @@ class StateStore:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    def request_trace(self, request_id: str):
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM usage_events WHERE request_id=? ORDER BY id",
+                (request_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
     def usage_summary(self, since: float):
         with self._lock:
             totals = self._conn.execute(
