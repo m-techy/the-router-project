@@ -8,8 +8,10 @@ The Router is a personal-first AI gateway for hobby projects, prototypes, agents
 
 ## What you get
 
-- OpenAI-compatible `POST /v1/chat/completions`
-- virtual routes: `free/auto`, `free/fast`, `free/smart`, `free/code`, `free/reasoning`, `free/vision`, `free/long`
+- OpenAI-compatible `POST /v1/chat/completions`, `POST /v1/embeddings`, and `POST /v1/audio/transcriptions`
+- chat routes: `free/auto`, `free/fast`, `free/smart`, `free/code`, `free/reasoning`, `free/vision`, `free/long`
+- embedding routes: `embed/auto`, `embed/text`, `embed/multimodal`
+- transcription routes: `transcribe/auto`, `transcribe/fast`, `transcribe/accurate`
 - automatic provider/model fallback before a response begins
 - capability-aware routing for tools, JSON, vision, coding, reasoning, and context size
 - persistent SQLite usage ledger, request traces, and provider health state
@@ -111,6 +113,34 @@ print(response.choices[0].message.content)
 
 Your app does not need to know whether the request actually ran on Groq, Gemini, Cerebras, Z.AI, Kilo, OVH, or another configured pool.
 
+### Embeddings
+
+OpenAI SDKs can use the same base URL:
+
+```python
+embedding = client.embeddings.create(
+    model="embed/auto",
+    input=["first document", "second document"],
+)
+print(len(embedding.data[0].embedding))
+```
+
+For Gemini multimodal embeddings, The Router also accepts structured parts through the raw endpoint and can route inline text, image data URLs, and base64 audio to `embed/multimodal`. Text-only embedding models are automatically excluded when the input needs vision or audio.
+
+### Audio transcription
+
+```python
+with open("meeting.wav", "rb") as audio:
+    transcript = client.audio.transcriptions.create(
+        model="transcribe/auto",
+        file=audio,
+    )
+
+print(transcript.text)
+```
+
+`transcribe/fast` favors observed latency; `transcribe/accurate` gives more weight to model quality. The initial v0.4 pool uses Groq's reviewed Whisper models.
+
 ## Web platform
 
 The browser UI is the primary control plane, not an optional demo. It provides first-run provider setup, generated SDK snippets, an in-app usage guide, quota/health visibility, certification probes, model inventory, route previews, an interactive playground, persistent request traces, and a review queue for upstream model changes.
@@ -133,11 +163,11 @@ See `docs/DEPLOYMENT.md` for the deployment split.
 
 ### Persistent / recurring free
 
-Groq, Cerebras, Google AI Studio / Gemini, Cloudflare Workers AI, OpenRouter free models, Mistral, Codestral, Z.AI / Zhipu GLM Flash, SiliconFlow zero-price models, NVIDIA NIM, SambaNova, Kilo Gateway, LLM7, OVHcloud AI Endpoints sandbox, Requesty, Routeway, OrcaRouter, and Ollama Cloud.
+Groq, Cerebras, Google AI Studio / Gemini, Cloudflare Workers AI, OpenRouter free models, Vercel AI Gateway reviewed zero-price models, Mistral, Codestral, Z.AI / Zhipu GLM Flash, SiliconFlow zero-price models, NVIDIA NIM, SambaNova, Kilo Gateway, LLM7, OVHcloud AI Endpoints sandbox, Requesty, Routeway, OrcaRouter, and Ollama Cloud.
 
 ### Promotional / opt-in
 
-OpenCode Zen and temporary developer campaigns such as Volcengine Ark / Doubao offers.
+OpenCode Zen, Pollinations Pollen-backed access, Hugging Face Inference Providers' small monthly credit pool, and temporary developer campaigns such as Volcengine Ark / Doubao offers.
 
 ### Trial / expiring / not baseline
 
@@ -252,6 +282,8 @@ uvicorn app.main:app --reload --port 4010
 | Endpoint | Purpose |
 |---|---|
 | `POST /v1/chat/completions` | OpenAI-compatible routed completion |
+| `POST /v1/embeddings` | Quota-aware embeddings through `embed/*` routes |
+| `POST /v1/audio/transcriptions` | Routed audio transcription through `transcribe/*` routes |
 | `GET /v1/models` | Virtual routes + reviewed provider/model IDs |
 | `GET /v1/providers` | Provider state/capabilities/quota metadata |
 | `GET /v1/quota` | Current local + provider-reported quota state |
