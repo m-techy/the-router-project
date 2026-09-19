@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 import uuid
 from collections.abc import AsyncIterator
 from typing import Any, Callable
@@ -205,6 +206,21 @@ class OpenAICompatibleAdapter(ProviderAdapter):
             )
         if request.n != 1:
             raise ProviderError("Cloudflare FLUX currently supports n=1 through The Router.", 422)
+        if len(request.prompt) > 2048:
+            raise ProviderError(
+                "Cloudflare FLUX prompt must be 2048 characters or fewer.",
+                422,
+            )
+        if request.size not in {None, "auto"}:
+            raise ProviderError(
+                "Cloudflare FLUX does not expose an image-size parameter through this route.",
+                422,
+            )
+        if request.background == "transparent":
+            raise ProviderError(
+                "Cloudflare FLUX does not expose transparent background control.",
+                422,
+            )
         if request.response_format == "url":
             raise ProviderError(
                 "Cloudflare FLUX returns image bytes/base64, not a hosted result URL.",
@@ -262,7 +278,7 @@ class OpenAICompatibleAdapter(ProviderAdapter):
             raise ProviderError("Cloudflare image response did not contain image data.", 502)
 
         return {
-            "created": int(__import__("time").time()),
+            "created": int(time.time()),
             "data": [{"b64_json": image}],
             "output_format": request.output_format or "jpeg",
             "quality": request.quality or "auto",
