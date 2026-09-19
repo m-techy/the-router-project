@@ -17,8 +17,13 @@ from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .certification import certify_provider
-from .modalities import EMBEDDING_MODELS, TRANSCRIPTION_MODELS, ModalityRouter
-from .models import ChatCompletionRequest, EmbeddingRequest
+from .modalities import EMBEDDING_MODELS, IMAGE_MODELS, TRANSCRIPTION_MODELS, ModalityRouter
+from .models import (
+    ChatCompletionRequest,
+    EmbeddingRequest,
+    ImageGenerationRequest,
+    ResponseCreateRequest,
+)
 from .project_keys import (
     ProjectCreate,
     authenticate_project,
@@ -27,6 +32,11 @@ from .project_keys import (
     project_limit_state,
 )
 from .quota import QuotaManager
+from .responses_compat import (
+    chat_body_to_response,
+    chat_stream_to_responses,
+    response_request_to_chat,
+)
 from .quota_telemetry import QuotaTelemetry
 from .registry import ProviderRegistry, model_is_current
 from .router import FreeRouter, VIRTUAL_MODELS, request_requirements
@@ -291,7 +301,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(
     title="The Router",
     description="Free-tier-aware multi-provider AI router",
-    version="0.7.0",
+    version="0.8.0",
     lifespan=lifespan,
 )
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -334,7 +344,7 @@ async def setup_snippets(request: Request) -> dict[str, Any]:
     return {
         "base_url": f"{public_base_url(request)}/v1",
         "snippets": client_snippets(public_base_url(request)),
-        "virtual_models": sorted(VIRTUAL_MODELS | EMBEDDING_MODELS | TRANSCRIPTION_MODELS),
+        "virtual_models": sorted(VIRTUAL_MODELS | EMBEDDING_MODELS | TRANSCRIPTION_MODELS | IMAGE_MODELS),
     }
 
 
@@ -784,7 +794,11 @@ async def models() -> dict[str, Any]:
     data = [
         {"id": model, "object": "model", "owned_by": "the-router"}
         for model in sorted(
-            VIRTUAL_MODELS | EMBEDDING_MODELS | TRANSCRIPTION_MODELS | route_models
+            VIRTUAL_MODELS
+            | EMBEDDING_MODELS
+            | TRANSCRIPTION_MODELS
+            | IMAGE_MODELS
+            | route_models
         )
     ]
     for provider in registry.providers:
@@ -938,6 +952,106 @@ async def env_requirements() -> dict[str, Any]:
             for provider in registry.providers
         ]
     }
+
+
+@app.post("/v1/responses")
+async def responses(
+    request: ResponseCreateRequest,
+    response: Response,
+    authorization: str | None = Header(default=None),
+):
+    require_routing_runtime()
+    if request.stream and request.tools:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Streaming Responses with function-tool deltas is not supported yet. "
+                "Use stream=false for tool calls, or stream text-only Responses."
+            ),
+        )
+
+    try:
+        chat_request = response_request_to_chat(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    project = project_access(authorization)
+    begin_project_request(project)
+    allow_trial, allow_promo = route_flags(request.model)
+
+    if request.stream:
+        try:
+            iterator, provider, model, fallback_count, reason = await router.stream(
+                chat_request,
+                allow_trial=allow_trial,
+                allow_promo=allow_promo,
+            )
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+        return StreamingResponse(
+            chat_stream_to_responses(
+                iterator,
+                request,
+                provider=provider,
+                model=model,
+            ),
+            media_type="text/event-stream",
+            headers={
+                "x-router-provider": provider,
+                "x-router-model": model,
+                "x-router-fallback-count": str(fallback_count),
+                "x-router-reason": reason,
+            },
+        )
+
+    try:
+        routed = await router.chat(
+            chat_request,
+            allow_trial=allow_trial,
+            allow_promo=allow_promo,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    record_project_tokens(project, routed.body)
+    response.headers["x-router-provider"] = routed.provider
+    response.headers["x-router-model"] = routed.model
+    response.headers["x-router-fallback-count"] = str(routed.fallback_count)
+    response.headers["x-router-reason"] = routed.route_reason
+    return chat_body_to_response(
+        routed.body,
+        request,
+        provider=routed.provider,
+        model=routed.model,
+    )
+
+
+@app.post("/v1/images/generations")
+async def images_generations(
+    request: ImageGenerationRequest,
+    response: Response,
+    authorization: str | None = Header(default=None),
+):
+    require_routing_runtime()
+    project = project_access(authorization)
+    begin_project_request(project)
+    allow_trial, allow_promo = route_flags(request.model)
+
+    try:
+        routed = await modalities.image_generation(
+            request,
+            allow_trial=allow_trial,
+            allow_promo=allow_promo,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    response.headers["x-router-provider"] = routed.provider
+    response.headers["x-router-model"] = routed.model
+    response.headers["x-router-fallback-count"] = str(routed.fallback_count)
+    response.headers["x-router-reason"] = routed.route_reason
+    return routed.body
 
 
 @app.post("/v1/embeddings")
