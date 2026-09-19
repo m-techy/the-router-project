@@ -38,10 +38,10 @@
 - [x] task-aware virtual routes per modality
 
 ## v0.5 — platform UX
-- [ ] encrypted local key vault option
-- [ ] live event stream
-- [ ] per-project local router keys and usage limits
-- [ ] export/import config with secrets excluded by default
+- [x] encrypted local key vault option
+- [x] live event stream
+- [x] per-project local router keys and usage limits
+- [x] export/import config with secrets excluded by default
 - [x] provider configuration writes through the local dashboard without exposing secrets
 
 ## v1.0
