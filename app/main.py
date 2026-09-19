@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import datetime as dt
 import json
 import os
 import time
@@ -29,6 +30,13 @@ from .quota import QuotaManager
 from .quota_telemetry import QuotaTelemetry
 from .registry import ProviderRegistry, model_is_current
 from .router import FreeRouter, VIRTUAL_MODELS, request_requirements
+from .route_profiles import (
+    RouteProfile,
+    delete_route_profile,
+    load_route_profiles,
+    route_model_id,
+    save_route_profile,
+)
 from .setup import SetupValue, configured_value, known_setup_keys, provider_setup_status
 from .state_backend import create_state_store, state_backend_info
 
@@ -64,8 +72,17 @@ def configured(provider) -> bool:
 
 
 def route_flags(model: str) -> tuple[bool, bool]:
-    allow_trial = env_bool("ROUTER_ALLOW_TRIAL") or model == "trial/auto"
-    allow_promo = env_bool("ROUTER_ALLOW_PROMO") or model == "promo/auto"
+    profile_trial, profile_promo = router.route_permissions(model)
+    allow_trial = (
+        env_bool("ROUTER_ALLOW_TRIAL")
+        or model == "trial/auto"
+        or profile_trial
+    )
+    allow_promo = (
+        env_bool("ROUTER_ALLOW_PROMO")
+        or model == "promo/auto"
+        or profile_promo
+    )
     return allow_trial, allow_promo
 
 
@@ -502,6 +519,215 @@ async def adapters() -> dict[str, Any]:
     return {"sdk_version": "1.0", "adapters": router.adapter_inventory()}
 
 
+@app.get("/api/routes")
+async def route_profiles() -> dict[str, Any]:
+    profiles = load_route_profiles(store)
+    return {
+        "routes": [
+            {
+                **profile.model_dump(),
+                "model": route_model_id(profile.slug),
+            }
+            for profile in profiles.values()
+        ]
+    }
+
+
+@app.post("/api/routes")
+async def create_or_update_route(
+    profile: RouteProfile,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    require_admin(authorization)
+    require_writable_control_plane()
+
+    provider_ids = {provider.id for provider in registry.providers}
+    unknown = sorted(
+        (set(profile.providers_allow) | set(profile.providers_deny)) - provider_ids
+    )
+    if unknown:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown providers in route profile: {', '.join(unknown)}",
+        )
+    overlap = sorted(set(profile.providers_allow) & set(profile.providers_deny))
+    if overlap:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Provider cannot be both allowed and denied: {', '.join(overlap)}",
+        )
+
+    save_route_profile(store, profile)
+    return {
+        "ok": True,
+        "route": profile.model_dump(),
+        "model": route_model_id(profile.slug),
+    }
+
+
+@app.delete("/api/routes/{slug}")
+async def remove_route_profile(
+    slug: str,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    require_admin(authorization)
+    require_writable_control_plane()
+    if not delete_route_profile(store, slug):
+        raise HTTPException(status_code=404, detail="Unknown route profile")
+    return {"ok": True, "slug": slug}
+
+
+@app.get("/api/doctor")
+async def doctor() -> dict[str, Any]:
+    setup = setup_status()
+    vault = store.vault_status()
+    profiles = load_route_profiles(store)
+    checks: list[dict[str, Any]] = []
+
+    def add(
+        check_id: str,
+        status: str,
+        title: str,
+        detail: str,
+        action_view: str | None = None,
+    ) -> None:
+        checks.append(
+            {
+                "id": check_id,
+                "status": status,
+                "title": title,
+                "detail": detail,
+                "action_view": action_view,
+            }
+        )
+
+    configured_count = int(setup.get("providers_ready") or 0)
+    persistent_count = int(setup.get("persistent_ready") or 0)
+    add(
+        "providers",
+        "pass" if configured_count else "warn",
+        "Provider capacity",
+        (
+            f"{configured_count} provider pools are ready."
+            if configured_count
+            else "No provider pool is ready for routing yet."
+        ),
+        None if configured_count else "setup",
+    )
+    add(
+        "redundancy",
+        "pass" if persistent_count >= 2 else "warn",
+        "Fallback redundancy",
+        (
+            f"{persistent_count} recurring-free pools are ready."
+            if persistent_count >= 2
+            else "Configure at least two recurring-free pools for meaningful fallback."
+        ),
+        "setup" if persistent_count < 2 else None,
+    )
+
+    stored = int(vault.get("stored_secrets") or 0)
+    encrypted = int(vault.get("encrypted_secrets") or 0)
+    add(
+        "vault",
+        "pass" if not stored or encrypted == stored else "warn",
+        "Credential storage",
+        (
+            "No local credentials are stored."
+            if not stored
+            else (
+                f"All {stored} stored credentials are encrypted."
+                if encrypted == stored
+                else f"{stored - encrypted} stored credential(s) are not encrypted at rest."
+            )
+        ),
+        "setup" if stored and encrypted != stored else None,
+    )
+
+    try:
+        updated = dt.date.fromisoformat(registry.data.updated_at)
+        age = (dt.datetime.now(dt.timezone.utc).date() - updated).days
+    except ValueError:
+        age = 999
+    add(
+        "registry",
+        "pass" if age <= 14 else "warn",
+        "Provider registry freshness",
+        (
+            f"Registry was reviewed {age} day(s) ago."
+            if age <= 14
+            else f"Registry is {age} day(s) old; free-tier/model status should be reviewed."
+        ),
+        "catalog" if age > 14 else None,
+    )
+
+    preview_request = ChatCompletionRequest(
+        model="free/auto",
+        messages=[{"role": "user", "content": "health check"}],
+        max_tokens=1,
+    )
+    candidates = router.preview(
+        preview_request,
+        allow_trial=False,
+        allow_promo=False,
+        limit=5,
+    )
+    add(
+        "routing",
+        "pass" if candidates else "warn",
+        "Default route",
+        (
+            f"free/auto currently has {len(candidates)} eligible candidate(s)."
+            if candidates
+            else "free/auto has no eligible configured candidate right now."
+        ),
+        "providers" if not candidates else None,
+    )
+
+    add(
+        "projects",
+        "pass" if setup.get("projects", {}).get("count") else "info",
+        "Project isolation",
+        (
+            f"{setup.get('projects', {}).get('count', 0)} project key(s) exist."
+            if setup.get("projects", {}).get("count")
+            else "Project keys are optional locally; create one when an app needs its own limits."
+        ),
+        "projects",
+    )
+    add(
+        "routes",
+        "pass" if profiles else "info",
+        "Custom routing",
+        (
+            f"{len(profiles)} custom route profile(s) are configured."
+            if profiles
+            else "No custom routes yet; free/* presets remain available."
+        ),
+        "routes",
+    )
+
+    if IS_VERCEL:
+        ready = hosted_routing_ready()
+        add(
+            "hosted",
+            "pass" if ready else "info",
+            "Hosted routing",
+            "Hosted inference is ready." if ready else "Hosted routing remains safely disabled.",
+            None,
+        )
+
+    score = sum(1 for item in checks if item["status"] == "pass")
+    warnings = sum(1 for item in checks if item["status"] == "warn")
+    return {
+        "ok": warnings == 0,
+        "score": score,
+        "checks_total": len(checks),
+        "warnings": warnings,
+        "checks": checks,
+    }
+
+
 @app.get("/v1/providers")
 @app.get("/api/providers")
 async def providers() -> dict[str, Any]:
@@ -550,9 +776,16 @@ async def quota_status() -> dict[str, Any]:
 
 @app.get("/v1/models")
 async def models() -> dict[str, Any]:
+    route_models = {
+        route_model_id(slug)
+        for slug, profile in load_route_profiles(store).items()
+        if profile.enabled
+    }
     data = [
         {"id": model, "object": "model", "owned_by": "the-router"}
-        for model in sorted(VIRTUAL_MODELS | EMBEDDING_MODELS | TRANSCRIPTION_MODELS)
+        for model in sorted(
+            VIRTUAL_MODELS | EMBEDDING_MODELS | TRANSCRIPTION_MODELS | route_models
+        )
     ]
     for provider in registry.providers:
         for model in provider.models:
@@ -613,7 +846,7 @@ async def usage_trace(request_id: str) -> dict[str, Any]:
 async def route_preview(request: ChatCompletionRequest) -> dict[str, Any]:
     allow_trial, allow_promo = route_flags(request.model)
     return {
-        "requirements": sorted(request_requirements(request)),
+        "requirements": sorted(router.resolved_requirements(request)),
         "candidates": router.preview(
             request,
             allow_trial=allow_trial,
