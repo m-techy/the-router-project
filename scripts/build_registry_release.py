@@ -53,7 +53,7 @@ def build() -> dict[str, object]:
         "model_count": sum(len(provider.get("models") or []) for provider in providers),
         "providers_sha256": provider_sha,
         "source_repository": "m-techy/the-router-project",
-        "source_commit": os.getenv("GITHUB_SHA") or os.getenv("ROUTER_SOURCE_COMMIT"),
+        "source_commit": os.getenv("ROUTER_SOURCE_COMMIT") or os.getenv("GITHUB_SHA"),
     }
     manifest_bytes = canonical_json(manifest)
     checksum_bytes = f"{provider_sha}  providers.json\n".encode("utf-8")
