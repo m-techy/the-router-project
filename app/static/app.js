@@ -9,6 +9,8 @@
     snippets: null,
     catalog: null,
     projects: null,
+    routes: [],
+    doctor: null,
     newProjectKey: null,
     activeSnippet: "python",
     currentView: "overview",
@@ -18,6 +20,8 @@
     overview: ["Overview", "Free capacity at a glance."],
     setup: ["Setup", "Connect providers and configure this router."],
     projects: ["Projects", "Local router keys and daily usage limits."],
+    routes: ["Routes", "Named routing policy for each application."],
+    doctor: ["Doctor", "Readiness, redundancy, and safety checks."],
     guide: ["Guide", "Run, configure, test, and integrate."],
     providers: ["Providers", "Quota, health, models, and live probes."],
     playground: ["Playground", "Test routing before changing your app."],
@@ -528,6 +532,97 @@
       : '<div class="empty-state">No project keys yet. Create one above for an app that should have its own limit.</div>';
   }
 
+  function renderRoutes() {
+    const host = $("#routeList");
+    if (!host) return;
+    const routes = state.routes || [];
+
+    host.innerHTML = routes.length
+      ? routes
+          .map((route) => {
+            const allow = route.providers_allow?.length
+              ? route.providers_allow.join(", ")
+              : "any reviewed provider";
+            const deny = route.providers_deny?.length
+              ? route.providers_deny.join(", ")
+              : "none";
+            return `
+              <article class="route-profile-row">
+                <div class="route-profile-id">
+                  <strong>${esc(route.model)}</strong>
+                  <span>${esc(route.name)}</span>
+                </div>
+                <div class="route-profile-policy">
+                  <span>strategy <b>${esc(route.base_route)}</b></span>
+                  <span>fallbacks <b>${esc(route.max_fallbacks)}</b></span>
+                  <span>context <b>${route.min_context ? fmt(route.min_context) : "any"}</b></span>
+                </div>
+                <div class="route-profile-scope">
+                  <span>allow: ${esc(allow)}</span>
+                  <span>deny: ${esc(deny)}</span>
+                </div>
+                <div class="route-profile-actions">
+                  <button type="button" class="row-action route-copy" data-model="${esc(route.model)}">copy</button>
+                  <button type="button" class="row-action route-delete" data-route="${esc(route.slug)}">delete</button>
+                </div>
+              </article>
+            `;
+          })
+          .join("")
+      : '<div class="empty-state">No custom routes yet. free/* remains the default policy surface.</div>';
+  }
+
+  function renderDoctor() {
+    const report = state.doctor || {};
+    const checks = report.checks || [];
+    const score = $("#doctorScore");
+    const summary = $("#doctorSummary");
+    if (score) score.textContent = checks.length ? `${report.score || 0}/${report.checks_total || checks.length}` : "—";
+    if (summary) {
+      summary.textContent = report.warnings
+        ? `${report.warnings} warning${report.warnings === 1 ? "" : "s"} need attention`
+        : checks.length
+          ? "No blocking readiness warnings"
+          : "Doctor unavailable";
+    }
+
+    const host = $("#doctorChecks");
+    if (!host) return;
+    host.innerHTML = checks.length
+      ? checks
+          .map(
+            (check) => `
+              <article class="doctor-check doctor-${esc(check.status)}">
+                <div class="doctor-check-head">
+                  <span>${esc(check.status)}</span>
+                  <strong>${esc(check.title)}</strong>
+                </div>
+                <p>${esc(check.detail)}</p>
+                ${
+                  check.action_view
+                    ? `<button type="button" class="text-button doctor-action" data-view-jump="${esc(check.action_view)}">Open ${esc(check.action_view)} →</button>`
+                    : ""
+                }
+              </article>
+            `,
+          )
+          .join("")
+      : '<div class="empty-state">No doctor report available.</div>';
+  }
+
+  function renderRouteModels() {
+    const select = $("#playModel");
+    if (!select) return;
+    const existing = new Set([...select.options].map((option) => option.value));
+    for (const route of state.routes || []) {
+      if (existing.has(route.model)) continue;
+      const option = document.createElement("option");
+      option.value = route.model;
+      option.textContent = route.model;
+      select.appendChild(option);
+    }
+  }
+
   function renderUsage(summary) {
     const totals = summary.totals || {};
     $("#usageStats").innerHTML =
@@ -644,9 +739,11 @@
         api("/api/setup/snippets"),
         api("/api/catalog/reconciliation"),
         api("/api/projects"),
+        api("/api/routes"),
+        api("/api/doctor"),
       ]);
 
-      const [health, providers, usage, summary, setup, snippets, catalog, projects] =
+      const [health, providers, usage, summary, setup, snippets, catalog, projects, routes, doctor] =
         results.map((result) =>
           result.status === "fulfilled" ? result.value : null,
         );
@@ -662,6 +759,8 @@
       state.snippets = snippets || {};
       state.catalog = catalog || { available: false };
       state.projects = projects;
+      state.routes = routes?.routes || [];
+      state.doctor = doctor;
 
       $("#healthDot").classList.add("online");
       $("#healthLabel").textContent =
@@ -673,6 +772,9 @@
       renderUsage(summary || { totals: {} });
       renderCatalog();
       renderProjects();
+      renderRoutes();
+      renderDoctor();
+      renderRouteModels();
     } catch (error) {
       $("#healthDot").classList.remove("online");
       $("#healthLabel").textContent = "Router unavailable";
@@ -774,6 +876,29 @@
         return;
       }
 
+      const routeCopy = event.target.closest(".route-copy");
+      if (routeCopy) {
+        await copyText(routeCopy.dataset.model || "", "Route model copied");
+        return;
+      }
+
+      const routeDelete = event.target.closest(".route-delete");
+      if (routeDelete) {
+        routeDelete.disabled = true;
+        try {
+          await api(`/api/routes/${encodeURIComponent(routeDelete.dataset.route)}`, {
+            method: "DELETE",
+          });
+          toast("Route profile deleted", "good");
+          await refresh();
+        } catch (error) {
+          toast(error.message || "Could not delete route", "bad");
+        } finally {
+          routeDelete.disabled = false;
+        }
+        return;
+      }
+
       const projectDelete = event.target.closest(".project-delete");
       if (projectDelete) {
         projectDelete.disabled = true;
@@ -810,6 +935,57 @@
     $("#copySnippet").addEventListener("click", () =>
       copyText($("#snippetCode").textContent, "Snippet copied"),
     );
+
+    $("#saveRoute").addEventListener("click", async () => {
+      const button = $("#saveRoute");
+      const slug = $("#routeSlug").value.trim().toLowerCase();
+      const name = $("#routeName").value.trim();
+      if (!slug || !name) {
+        toast("Route name and slug are required", "neutral");
+        return;
+      }
+
+      const splitProviders = (value) =>
+        value
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+
+      const context = Number($("#routeContext").value || 0);
+      const fallbacks = Number($("#routeFallbacks").value || 8);
+      button.disabled = true;
+      try {
+        await api("/api/routes", {
+          method: "POST",
+          body: JSON.stringify({
+            slug,
+            name,
+            base_route: $("#routeBase").value,
+            providers_allow: splitProviders($("#routeAllow").value),
+            providers_deny: splitProviders($("#routeDeny").value),
+            min_context: context > 0 ? context : null,
+            max_fallbacks: fallbacks,
+            allow_promo: $("#routePromo").checked,
+            allow_trial: $("#routeTrial").checked,
+            enabled: true,
+          }),
+        });
+        ["#routeName", "#routeSlug", "#routeAllow", "#routeDeny", "#routeContext"].forEach(
+          (selector) => {
+            $(selector).value = "";
+          },
+        );
+        $("#routeFallbacks").value = "8";
+        $("#routePromo").checked = false;
+        $("#routeTrial").checked = false;
+        toast(`route/${slug} saved`, "good");
+        await refresh();
+      } catch (error) {
+        toast(error.message || "Could not save route", "bad");
+      } finally {
+        button.disabled = false;
+      }
+    });
 
     $("#copyProjectKey").addEventListener("click", () => {
       const value = $("#newProjectKeyValue").textContent;
