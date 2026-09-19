@@ -80,8 +80,9 @@ The built-in platform UI runs on the same port as the API.
 
 **Setup**
 - first-run readiness score
-- missing environment variables
+- missing provider credentials and local/env configuration source
 - provider signup/docs shortcuts
+- local browser setup for personal self-hosting (stored in local SQLite; not encrypted at rest yet)
 - OpenAI SDK connection snippets
 
 **Providers**
@@ -104,7 +105,7 @@ The built-in platform UI runs on the same port as the API.
 - per-request fallback chain
 - provider errors before the final successful route
 
-Provider keys are never rendered in the dashboard.
+Provider keys are never rendered back in the dashboard. For personal local installs they can be saved through Setup into the local SQLite secret store; that store is **not encrypted at rest yet**, so environment variables are preferred for shared/remote deployments.
 
 ## Provider coverage
 
@@ -236,6 +237,9 @@ uvicorn app.main:app --reload --port 4010
 | `GET /api/setup/snippets` | Copyable Python/JS/cURL client configs |
 | `POST /api/route/preview` | Score candidates without inference |
 | `POST /api/providers/{id}/certify` | Tiny live provider probe |
+| `POST /api/providers/{id}/quota/refresh` | Refresh supported active quota/account telemetry |
+| `GET /api/catalog/reconciliation` | Review-only upstream model additions/removals |
+| `POST /api/setup/value` | Save a known provider setup value locally (self-hosted mode) |
 | `GET /api/usage/summary` | Aggregated persistent usage |
 | `GET /api/usage/recent` | Recent request ledger |
 | `GET /api/usage/trace/{request_id}` | Full fallback chain for one routed request |
