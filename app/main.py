@@ -30,7 +30,7 @@ from .quota_telemetry import QuotaTelemetry
 from .registry import ProviderRegistry, model_is_current
 from .router import FreeRouter, VIRTUAL_MODELS, request_requirements
 from .setup import SetupValue, configured_value, known_setup_keys, provider_setup_status
-from .state import StateStore
+from .state_backend import create_state_store, state_backend_info
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_PATH = Path(
@@ -42,7 +42,7 @@ DB_PATH = Path(os.getenv("ROUTER_DB_PATH", DEFAULT_DB_PATH))
 STATIC_DIR = ROOT / "app" / "static"
 
 registry = ProviderRegistry(REGISTRY_PATH)
-store = StateStore(DB_PATH)
+store = create_state_store(DB_PATH)
 quota = QuotaManager(store)
 router = FreeRouter(
     registry,
@@ -69,10 +69,56 @@ def route_flags(model: str) -> tuple[bool, bool]:
     return allow_trial, allow_promo
 
 
+def hosted_control_plane_ready() -> bool:
+    info = state_backend_info(store)
+    return bool(
+        info["serverless_safe"]
+        and store.vault_status().get("enabled")
+        and os.getenv("ROUTER_ADMIN_KEY")
+    )
+
+
+def hosted_routing_ready() -> bool:
+    return bool(
+        hosted_control_plane_ready()
+        and env_bool("ROUTER_ENABLE_HOSTED_API")
+        and env_bool("ROUTER_REQUIRE_PROJECT_KEYS")
+        and len(store.list_projects()) > 0
+    )
+
+
 def require_admin(authorization: str | None) -> None:
     admin_key = os.getenv("ROUTER_ADMIN_KEY")
+    if IS_VERCEL and not admin_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Hosted admin operations require ROUTER_ADMIN_KEY.",
+        )
     if admin_key and authorization != f"Bearer {admin_key}":
         raise HTTPException(status_code=401, detail="Admin authorization required")
+
+
+def require_writable_control_plane() -> None:
+    if IS_VERCEL and not hosted_control_plane_ready():
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Hosted writes require a serverless-safe Postgres state backend, "
+                "ROUTER_VAULT_KEY, and ROUTER_ADMIN_KEY."
+            ),
+        )
+
+
+def require_routing_runtime() -> None:
+    if IS_VERCEL and not hosted_routing_ready():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Hosted routing is fail-closed. Configure Postgres state, ROUTER_VAULT_KEY, "
+                "ROUTER_ADMIN_KEY, ROUTER_REQUIRE_PROJECT_KEYS=true, at least one project key, "
+                "and ROUTER_ENABLE_HOSTED_API=true."
+            ),
+        )
 
 
 class ConfigImport(BaseModel):
@@ -154,9 +200,14 @@ def setup_status() -> dict[str, Any]:
         "trial_enabled": env_bool("ROUTER_ALLOW_TRIAL"),
         "promo_enabled": env_bool("ROUTER_ALLOW_PROMO"),
         "transport": router.transport_mode,
-        "mode": "vercel-site" if IS_VERCEL else "local-platform",
-        "writable_setup": not IS_VERCEL,
-        "hosted_api_enabled": env_bool("ROUTER_ENABLE_HOSTED_API"),
+        "mode": (
+            "hosted-platform"
+            if IS_VERCEL and hosted_control_plane_ready()
+            else ("vercel-site" if IS_VERCEL else "local-platform")
+        ),
+        "writable_setup": (not IS_VERCEL) or hosted_control_plane_ready(),
+        "hosted_api_enabled": hosted_routing_ready(),
+        "state": state_backend_info(store),
         "provider_setup": provider_setup_status(registry, store),
         "vault": store.vault_status(),
         "projects": {
@@ -223,7 +274,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(
     title="The Router",
     description="Free-tier-aware multi-provider AI router",
-    version="0.6.0",
+    version="0.7.0",
     lifespan=lifespan,
 )
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -243,10 +294,16 @@ async def health() -> dict[str, Any]:
         "providers": len(registry.providers),
         "configured_providers": sum(1 for p in registry.providers if configured(p)),
         "registry_updated_at": registry.data.updated_at,
-        "db": str(DB_PATH),
+        "db": str(DB_PATH) if getattr(store, "backend_name", "") == "sqlite" else None,
+        "state": state_backend_info(store),
         "transport": router.transport_mode,
-        "mode": "vercel-site" if IS_VERCEL else "local-platform",
-        "hosted_api_enabled": env_bool("ROUTER_ENABLE_HOSTED_API"),
+        "mode": (
+            "hosted-platform"
+            if IS_VERCEL and hosted_control_plane_ready()
+            else ("vercel-site" if IS_VERCEL else "local-platform")
+        ),
+        "hosted_control_plane_ready": hosted_control_plane_ready() if IS_VERCEL else True,
+        "hosted_api_enabled": hosted_routing_ready() if IS_VERCEL else True,
     }
 
 
@@ -270,11 +327,7 @@ async def setup_value(
     authorization: str | None = Header(default=None),
 ) -> dict[str, Any]:
     require_admin(authorization)
-    if IS_VERCEL:
-        raise HTTPException(
-            status_code=409,
-            detail="Browser setup is disabled on Vercel. Configure provider keys as Vercel environment variables.",
-        )
+    require_writable_control_plane()
     allowed = known_setup_keys(registry)
     if item.key not in allowed:
         raise HTTPException(status_code=400, detail="Unknown setup key")
@@ -293,15 +346,31 @@ async def delete_setup_value(
     authorization: str | None = Header(default=None),
 ) -> dict[str, Any]:
     require_admin(authorization)
-    if IS_VERCEL:
-        raise HTTPException(
-            status_code=409,
-            detail="Browser setup is disabled on Vercel.",
-        )
+    require_writable_control_plane()
     if key not in known_setup_keys(registry):
         raise HTTPException(status_code=400, detail="Unknown setup key")
     store.delete_secret(key)
     return {"ok": True, "key": key}
+
+
+@app.get("/api/hosted/readiness")
+async def hosted_readiness() -> dict[str, Any]:
+    info = state_backend_info(store)
+    checks = {
+        "vercel": IS_VERCEL,
+        "serverless_safe_state": info["serverless_safe"],
+        "vault_key": bool(store.vault_status().get("enabled")),
+        "admin_key": bool(os.getenv("ROUTER_ADMIN_KEY")),
+        "project_keys_enforced": env_bool("ROUTER_REQUIRE_PROJECT_KEYS"),
+        "project_count": len(store.list_projects()),
+        "hosted_api_flag": env_bool("ROUTER_ENABLE_HOSTED_API"),
+    }
+    return {
+        "state": info,
+        "control_plane_ready": hosted_control_plane_ready() if IS_VERCEL else True,
+        "routing_ready": hosted_routing_ready() if IS_VERCEL else True,
+        "checks": checks,
+    }
 
 
 @app.get("/api/vault/status")
@@ -331,11 +400,7 @@ async def create_project(
     authorization: str | None = Header(default=None),
 ) -> dict[str, Any]:
     require_admin(authorization)
-    if IS_VERCEL:
-        raise HTTPException(
-            status_code=409,
-            detail="Project key creation is local/self-hosted only.",
-        )
+    require_writable_control_plane()
     created = create_project_key(store, item)
     return {
         **created,
@@ -349,6 +414,7 @@ async def delete_project(
     authorization: str | None = Header(default=None),
 ) -> dict[str, Any]:
     require_admin(authorization)
+    require_writable_control_plane()
     if not store.delete_project(project_id):
         raise HTTPException(status_code=404, detail="Unknown project")
     return {"ok": True, "id": project_id}
@@ -374,11 +440,7 @@ async def import_config(
     authorization: str | None = Header(default=None),
 ) -> dict[str, Any]:
     require_admin(authorization)
-    if IS_VERCEL:
-        raise HTTPException(
-            status_code=409,
-            detail="Config import is local/self-hosted only.",
-        )
+    require_writable_control_plane()
     if item.version != 1:
         raise HTTPException(status_code=400, detail="Unsupported config export version")
     if len(item.settings) > 500:
@@ -651,14 +713,7 @@ async def embeddings(
     response: Response,
     authorization: str | None = Header(default=None),
 ):
-    if IS_VERCEL and not env_bool("ROUTER_ENABLE_HOSTED_API"):
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Hosted router API is disabled on this Vercel deployment. "
-                "Run The Router locally for durable quota and credential state."
-            ),
-        )
+    require_routing_runtime()
 
     project = project_access(authorization)
     begin_project_request(project)
@@ -690,14 +745,7 @@ async def audio_transcriptions(
     temperature: float | None = Form(default=None),
     authorization: str | None = Header(default=None),
 ):
-    if IS_VERCEL and not env_bool("ROUTER_ENABLE_HOSTED_API"):
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Hosted router API is disabled on this Vercel deployment. "
-                "Run The Router locally for durable quota and credential state."
-            ),
-        )
+    require_routing_runtime()
 
     content = await file.read()
     if not content:
@@ -740,15 +788,7 @@ async def chat_completions(
     response: Response,
     authorization: str | None = Header(default=None),
 ):
-    if IS_VERCEL and not env_bool("ROUTER_ENABLE_HOSTED_API"):
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Hosted router API is disabled on this Vercel deployment. "
-                "Use the local one-command platform, or enable hosted mode only after configuring "
-                "provider credentials and a durable remote state backend."
-            ),
-        )
+    require_routing_runtime()
     project = project_access(authorization)
     begin_project_request(project)
     allow_trial, allow_promo = route_flags(request.model)
