@@ -22,6 +22,14 @@ providers:
         context: 131000
         quality: 0.82
         capabilities: {chat: true, streaming: true, tools: true, json_mode: true, reasoning: true, coding: true}
+      - id: whisper-large-v3-turbo
+        label: Whisper Large V3 Turbo
+        quality: 0.88
+        capabilities: {chat: false, streaming: false, audio: true, transcription: true, coding: false}
+      - id: whisper-large-v3
+        label: Whisper Large V3
+        quality: 0.96
+        capabilities: {chat: false, streaming: false, audio: true, transcription: true, coding: false}
 
   - id: cerebras
     name: Cerebras Inference
@@ -70,6 +78,11 @@ providers:
         context: 1000000
         quality: 0.80
         capabilities: {chat: true, streaming: true, tools: true, json_mode: true, vision: true, coding: true}
+      - id: gemini-embedding-2
+        label: Gemini Embedding 2
+        context: 8192
+        quality: 0.96
+        capabilities: {chat: false, streaming: false, vision: true, audio: true, embeddings: true, coding: false}
 
   - id: cloudflare-ai
     name: Cloudflare Workers AI
@@ -91,6 +104,18 @@ providers:
         label: Qwen3 30B
         quality: 0.70
         capabilities: {chat: true, streaming: true, reasoning: true, coding: true}
+      - id: "@cf/baai/bge-m3"
+        label: BGE M3 Embeddings
+        quality: 0.82
+        capabilities: {chat: false, streaming: false, embeddings: true, coding: false}
+      - id: "@cf/qwen/qwen3-embedding-0.6b"
+        label: Qwen3 Embedding 0.6B
+        quality: 0.78
+        capabilities: {chat: false, streaming: false, embeddings: true, coding: false}
+      - id: "@cf/black-forest-labs/flux-1-schnell"
+        label: FLUX.1 Schnell
+        quality: 0.78
+        capabilities: {chat: false, streaming: false, image_generation: true, coding: false}
 
   - id: openrouter
     name: OpenRouter Free
@@ -114,6 +139,54 @@ providers:
         context: 1000000
         quality: 0.91
         capabilities: {chat: true, streaming: true, tools: true, json_mode: true, reasoning: true, coding: true}
+
+  - id: vercel-ai-gateway
+    name: Vercel AI Gateway Free
+    tier: persistent_free
+    env_key: AI_GATEWAY_API_KEY
+    base_url: https://ai-gateway.vercel.sh/v1
+    priority: 1.01
+    confidence: high
+    verification: official-zero-price-models + official-free-credit-policy + free-coding-models-live
+    signup_url: https://vercel.com/ai-gateway
+    docs_url: https://vercel.com/docs/ai-gateway/openai-compat
+    quota: {scope: account, monthly_credits_usd: 5, source: "explicit $0 models plus $5/30-day free allowance for unpaid users"}
+    notes: ["Only reviewed zero-price models are routed by default; the monthly credit allowance is not treated as permission to select arbitrary paid models."]
+    models:
+      - id: minimax/minimax-m3-free
+        label: MiniMax M3 Free
+        context: 1000000
+        quality: 0.94
+        capabilities: {chat: true, streaming: true, reasoning: true, coding: true}
+      - id: inclusionai/ling-3.0-flash-vl
+        label: Ling 3.0 Flash VL Free
+        context: 256000
+        quality: 0.87
+        capabilities: {chat: true, streaming: true, tools: true, vision: true, reasoning: true, coding: true}
+      - id: poolside/laguna-s-2.1-free
+        label: Laguna S 2.1 Free
+        context: 256000
+        quality: 0.88
+        capabilities: {chat: true, streaming: true, reasoning: true, coding: true}
+
+  - id: huggingface
+    name: Hugging Face Inference Providers
+    tier: persistent_free
+    env_key: HF_TOKEN
+    base_url: https://router.huggingface.co/v1
+    priority: 0.42
+    confidence: high
+    verification: official-monthly-credits + official-openai-compat
+    signup_url: https://huggingface.co/settings/tokens
+    docs_url: https://huggingface.co/docs/inference-providers/guides/llm
+    quota: {scope: account, monthly_credits_usd: 0.10, source: "recurring monthly free-user credits; intentionally low-priority"}
+    notes: ["Tiny recurring allowance; retained as emergency fallback rather than primary capacity."]
+    models:
+      - id: openai/gpt-oss-120b
+        label: GPT OSS 120B
+        context: 131000
+        quality: 0.88
+        capabilities: {chat: true, streaming: true, tools: true, reasoning: true, coding: true}
 
   - id: mistral
     name: Mistral La Plateforme
@@ -383,6 +456,24 @@ providers:
         label: Big Pickle
         context: 200000
         quality: 0.91
+        capabilities: {chat: true, streaming: true, reasoning: true, coding: true}
+
+  - id: pollinations
+    name: Pollinations AI
+    tier: promotional
+    env_key: POLLINATIONS_API_KEY
+    base_url: https://gen.pollinations.ai/v1
+    priority: 0.56
+    confidence: medium
+    verification: official-api-docs + free-coding-models-live
+    signup_url: https://enter.pollinations.ai/
+    docs_url: https://github.com/pollinations/pollinations/blob/master/APIDOCS.md
+    quota: {scope: account, source: "Pollen-funded usage; free grants depend on quests/tier and can be zero"}
+    notes: ["Experimental opt-in pool because free Pollen availability is variable rather than guaranteed recurring capacity."]
+    models:
+      - id: openai/gpt-5.4-nano
+        label: GPT 5.4 Nano via Pollinations
+        quality: 0.80
         capabilities: {chat: true, streaming: true, reasoning: true, coding: true}
 
   - id: dashscope
