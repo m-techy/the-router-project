@@ -19,6 +19,7 @@
         <button class="nav" data-view="providers">Providers</button>
         <button class="nav" data-view="playground">Playground</button>
         <button class="nav" data-view="usage">Usage & traces</button>
+        <button class="nav" data-view="catalog">Catalog review</button>
       </nav>
       <div class="sidebar-foot">
         <span class="dot" id="healthDot"></span>
@@ -139,6 +140,15 @@
             <div id="traceDetail" class="trace-empty">Each provider attempt for a request appears here.</div>
           </article>
         </div>
+      </section>
+
+      <section id="catalog" class="view">
+        <div class="stats" id="catalogStats"></div>
+        <article class="panel">
+          <div class="panel-head"><h3>Upstream review queue</h3><span>free-coding-models vs reviewed registry</span></div>
+          <div id="catalogStatus" class="sub"></div>
+          <div id="catalogChanges" class="catalog-list"></div>
+        </article>
       </section>
     </main>
   </div>
