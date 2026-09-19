@@ -153,6 +153,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .capacity-row strong,.capacity-row span{display:block}.capacity-row strong{font-size:10px;font-weight:500}.capacity-row span{font-size:7px;color:var(--muted);margin-top:2px}.capacity-row>b{text-align:right;font-size:9px;font-weight:500}
 .meter,.headroom-track{height:3px;background:#1b232a;overflow:hidden}.meter i,.headroom-track i{display:block;height:100%;background:linear-gradient(90deg,var(--cyan),var(--lime))}
 .empty-state,.trace-empty{padding:28px 10px;text-align:center;color:var(--muted);font-size:9px}
+.sub{font-size:8px;color:var(--muted);line-height:1.5}.setup-note,.success-box{padding:11px 8px;border-bottom:1px solid var(--line);font-size:9px;line-height:1.55}.setup-note{color:#9eabb3}.success-box{color:var(--lime)}
 .table-wrap{overflow:auto}
 table{width:100%;border-collapse:collapse;font-size:9px}th,td{padding:10px 8px;text-align:left;border-bottom:1px solid #171d22;white-space:nowrap}th{font-size:7px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.09em;font-weight:500}td{color:#bfc8ce}.ok{color:var(--lime)}.err{color:var(--red)}
 .trace-link{border:0;background:transparent;color:var(--cyan);padding:0;font-size:8px}
