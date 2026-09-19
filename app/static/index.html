@@ -241,15 +241,19 @@
         <div class="guide-stack">
           <article><b>Run</b><h3>Native first, Docker when useful.</h3><p><code>start.bat</code> / <code>./start.sh</code> creates a reusable venv and launches the lightweight FastAPI process.</p></article>
           <article><b>Connect</b><h3>Add providers only once.</h3><p>Use Setup for local credentials or keep them in environment variables. No-key pools are immediately visible.</p></article>
-          <article><b>Route</b><h3>Ask for intent, not vendor names.</h3><p>Use <code>free/auto</code>, <code>free/fast</code>, <code>free/smart</code>, <code>free/code</code>, and other virtual routes.</p></article>
-          <article><b>Observe</b><h3>See every fallback.</h3><p>Usage traces show failed providers, winning models, latency, tokens, and cooldown behavior.</p></article>
+          <article><b>Chat</b><h3>Ask for intent, not vendor names.</h3><p>Use <code>free/auto</code>, <code>free/fast</code>, <code>free/smart</code>, <code>free/code</code>, and other virtual chat routes.</p></article>
+          <article><b>Embed</b><h3>Route text or multimodal embeddings.</h3><p>POST to <code>/v1/embeddings</code> with <code>embed/auto</code>, <code>embed/text</code>, or <code>embed/multimodal</code>. Gemini handles multimodal inputs; Cloudflare adds text embedding fallback.</p></article>
+          <article><b>Transcribe</b><h3>Route speech recognition through free Whisper capacity.</h3><p>POST multipart audio to <code>/v1/audio/transcriptions</code> with <code>transcribe/auto</code>, <code>transcribe/fast</code>, or <code>transcribe/accurate</code>.</p></article>
+          <article><b>Observe</b><h3>See every fallback.</h3><p>Usage traces show failed providers, winning models, latency, tokens, and cooldown behavior across modalities.</p></article>
         </div>
 
         <div class="route-accordion">
-          <button type="button" class="route-accordion-item active"><span>free/auto</span><strong>Balanced</strong><small>quality + quota + health</small></button>
-          <button type="button" class="route-accordion-item"><span>free/fast</span><strong>Responsive</strong><small>latency weighted</small></button>
-          <button type="button" class="route-accordion-item"><span>free/smart</span><strong>Quality</strong><small>stronger models first</small></button>
-          <button type="button" class="route-accordion-item"><span>free/code</span><strong>Code-aware</strong><small>coding-capable pool</small></button>
+          <button type="button" class="route-accordion-item active"><span>free/auto</span><strong>Chat</strong><small>quality + quota + health</small></button>
+          <button type="button" class="route-accordion-item"><span>free/fast</span><strong>Fast chat</strong><small>latency weighted</small></button>
+          <button type="button" class="route-accordion-item"><span>embed/auto</span><strong>Embeddings</strong><small>Gemini + Cloudflare</small></button>
+          <button type="button" class="route-accordion-item"><span>embed/multimodal</span><strong>Multimodal</strong><small>text + image + audio</small></button>
+          <button type="button" class="route-accordion-item"><span>transcribe/fast</span><strong>Speech</strong><small>Whisper speed route</small></button>
+          <button type="button" class="route-accordion-item"><span>transcribe/accurate</span><strong>Accurate ASR</strong><small>quality weighted</small></button>
         </div>
       </section>
     </main>
