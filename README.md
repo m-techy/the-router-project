@@ -100,12 +100,16 @@ Full local guide: [docs/LOCAL.md](docs/LOCAL.md)
 
 The web console contains:
 
-- **Setup** — add/remove provider credentials from the browser.
-- **Guide** — install, routing, integration, and zero-cost behavior explained.
+- **Overview** — free-capacity headroom and recent route decisions.
+- **Setup** — add/remove provider credentials and export/import non-secret config.
+- **Projects** — issue per-app router keys and daily limits.
+- **Routes** — create stable `route/*` aliases with provider/context/fallback policy.
+- **Doctor** — inspect readiness, redundancy, registry freshness, storage safety, and route availability.
 - **Providers** — model inventory, live quota telemetry where supported, health, and certification.
-- **Playground** — preview routes and test prompts.
-- **Usage & traces** — persistent request history and fallback chains.
-- **Catalog review** — inspect upstream free-model additions/removals before promotion.
+- **Playground** — preview routes and test prompts with the current tab's project key when available.
+- **Usage** — persistent request history and fallback chains.
+- **Catalog** — inspect upstream free-model additions/removals before promotion.
+- **Guide** — install, routing, modalities, compatibility, and zero-cost behavior.
 
 Provider credentials saved through Setup stay in the local SQLite data store. Set `ROUTER_VAULT_KEY` to encrypt locally stored values at rest; environment variables still take precedence and remain a good choice for managed deployments.
 
@@ -299,7 +303,7 @@ x-router-fallback-count
 x-router-reason
 ```
 
-Streaming requests may fail over **before the first byte only**. The Router does not splice partial generations from different models.
+Streaming requests may fail over **before the first byte only**. The Router does not splice partial generations from different models. Streamed token usage is metered from provider usage chunks when available and otherwise conservatively estimated from text/tool deltas so quota and project accounting do not collapse to zero.
 
 ## Persistent quota, health, and traces
 
