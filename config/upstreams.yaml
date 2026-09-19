@@ -1,0 +1,41 @@
+updated_at: "2026-09-19"
+policy:
+  - "Track upstream fixes before writing provider-specific workarounds ourselves."
+  - "Do not auto-merge upstream code or provider metadata into production routing."
+  - "Use community catalogs for discovery; verify persistent-free status against official docs/live probes."
+  - "Respect upstream licenses when reusing code; ideas/behavior can be reimplemented independently."
+upstreams:
+  - repo: vava-nessa/free-coding-models
+    license: "MIT with enhanced disclaimers"
+    role: primary-provider-catalog-and-live-health-reference
+    use: [provider/model discovery, free-tier change detection, live model IDs and deprecations, provider-specific compatibility fixes, quota telemetry ideas]
+    watch_paths: [sources.js, docs/providers.md, src/core/ping.js, src/core/provider-quota-fetchers.js, src/core/schema-normalizer.js]
+  - repo: maximhq/bifrost
+    license: Apache-2.0
+    role: mature-data-plane-reference-and-possible-future-transport
+    use: [request/response normalization, retry and fallback behavior, key/provider abstractions, custom provider support, streaming compatibility]
+  - repo: QuantumNous/new-api
+    license: AGPL-3.0
+    reuse_policy: "reference behavior/fixes only unless the final project intentionally adopts AGPL-compatible code obligations"
+    role: chinese-ecosystem-gateway-reference
+    use: [Chinese provider adapters, OpenAI/Claude/Gemini cross-format conversion, channel priority/weight patterns, model mapping and failover fixes]
+  - repo: songquanpeng/one-api
+    license: MIT
+    role: original-chinese-gateway-reference
+    use: [Zhipu/GLM compatibility, Alibaba/Qwen compatibility, SiliconFlow balance/API fixes, Doubao/Volcengine patterns, Baidu/MiniMax/other China-provider adapters]
+  - repo: BerriAI/litellm
+    license: "MIT for core; enterprise directory has separate terms"
+    role: provider-normalization-and-proxy-reference
+    use: [provider request/response normalization, OpenAI compatibility edge cases, retry and fallback patterns, model metadata ideas]
+  - repo: DevvGwardo/free-llm-router
+    role: free-quota-routing-reference
+    use: [weighted remaining-capacity routing, simple free-tier config UX]
+  - repo: alienz-dev/llm-router
+    role: availability-and-quota-routing-reference
+    use: [health scoring, circuit breakers, task classification, model discovery/probing concepts]
+  - repo: spacepirate15/quantum-free-router
+    role: free-model-certification-reference
+    use: [active/retry-later/configured/quarantine lifecycle, certification checks, Bifrost integration ideas]
+  - repo: DeepakSilaych/free-api-gateway
+    role: usage-ledger-and-key-pool-reference
+    use: [usage events, Redis-backed rate counters, normalized inbound protocol ideas]
