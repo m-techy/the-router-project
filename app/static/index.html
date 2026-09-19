@@ -23,6 +23,8 @@
         <button type="button" class="nav active" data-view="overview">Overview</button>
         <button type="button" class="nav" data-view="setup">Setup</button>
         <button type="button" class="nav" data-view="projects">Projects</button>
+        <button type="button" class="nav" data-view="routes">Routes</button>
+        <button type="button" class="nav" data-view="doctor">Doctor</button>
         <button type="button" class="nav" data-view="providers">Providers</button>
         <button type="button" class="nav" data-view="playground">Playground</button>
         <button type="button" class="nav" data-view="usage">Usage</button>
@@ -201,6 +203,68 @@
           </div>
           <div id="projectList" class="project-list"></div>
         </section>
+      </section>
+
+      <section id="routes" class="view">
+        <section class="projects-intro">
+          <div>
+            <h2>Make routing policy<br />a named interface.</h2>
+            <p>Create aliases such as <code>route/my-app</code> that pin strategy, provider scope, context floor, and fallback depth without changing application code.</p>
+          </div>
+          <div class="route-create">
+            <div class="inline-fields">
+              <label>Name<input id="routeName" placeholder="My app default" maxlength="80" /></label>
+              <label>Slug<input id="routeSlug" placeholder="my-app" maxlength="32" /></label>
+            </div>
+            <label>Base strategy
+              <select id="routeBase">
+                <option value="free/auto">free/auto</option>
+                <option value="free/fast">free/fast</option>
+                <option value="free/smart">free/smart</option>
+                <option value="free/code">free/code</option>
+                <option value="free/reasoning">free/reasoning</option>
+                <option value="free/vision">free/vision</option>
+                <option value="free/long">free/long</option>
+              </select>
+            </label>
+            <div class="inline-fields">
+              <label>Allow providers<input id="routeAllow" placeholder="optional: groq,gemini" /></label>
+              <label>Deny providers<input id="routeDeny" placeholder="optional: provider-id" /></label>
+            </div>
+            <div class="inline-fields">
+              <label>Minimum context<input id="routeContext" type="number" min="1" placeholder="optional" /></label>
+              <label>Max fallbacks<input id="routeFallbacks" type="number" min="1" max="8" value="8" /></label>
+            </div>
+            <div class="route-toggles">
+              <label><input id="routePromo" type="checkbox" /> allow promotional pool</label>
+              <label><input id="routeTrial" type="checkbox" /> allow trial pool</label>
+            </div>
+            <button type="button" id="saveRoute" class="primary-action">Save route profile</button>
+          </div>
+        </section>
+
+        <section class="project-surface">
+          <div class="surface-head">
+            <div><span>Routing policy</span><strong>Custom route profiles</strong></div>
+            <small>Use the generated model ID from any OpenAI-compatible client.</small>
+          </div>
+          <div id="routeList" class="route-list"></div>
+        </section>
+      </section>
+
+      <section id="doctor" class="view">
+        <section class="doctor-hero">
+          <div>
+            <span>System Doctor</span>
+            <h2>Know what is actually<br />ready before traffic hits.</h2>
+            <p>The doctor checks provider redundancy, credential storage, registry freshness, default routing, projects, custom routes, and hosted safety without sending an inference request.</p>
+          </div>
+          <div class="doctor-score">
+            <strong id="doctorScore">—</strong>
+            <span id="doctorSummary">Running checks…</span>
+          </div>
+        </section>
+        <div id="doctorChecks" class="doctor-grid"></div>
       </section>
 
       <section id="providers" class="view">
