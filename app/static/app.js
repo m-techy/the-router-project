@@ -627,6 +627,20 @@
         return;
       }
 
+      const jump = event.target.closest("[data-view-jump]");
+      if (jump) {
+        setView(jump.dataset.viewJump);
+        return;
+      }
+
+      const accordion = event.target.closest(".route-accordion-item");
+      if (accordion) {
+        $(".route-accordion-item").forEach((item) =>
+          item.classList.toggle("active", item === accordion),
+        );
+        return;
+      }
+
       const save = event.target.closest(".setup-save");
       if (save) {
         const key = save.dataset.key;
