@@ -16,13 +16,16 @@ from .models import ChatCompletionRequest
 from .quota import QuotaManager
 from .registry import ProviderRegistry
 from .router import FreeRouter, VIRTUAL_MODELS, request_requirements
+from .setup import SetupValue, configured_value, known_setup_keys, provider_setup_status
 from .state import StateStore
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_PATH = Path(
     os.getenv("ROUTER_PROVIDER_REGISTRY", str(ROOT / "config" / "providers.yaml"))
 )
-DB_PATH = Path(os.getenv("ROUTER_DB_PATH", str(ROOT / "data" / "router.db")))
+IS_VERCEL = bool(os.getenv("VERCEL"))
+DEFAULT_DB_PATH = "/tmp/router.db" if IS_VERCEL else str(ROOT / "data" / "router.db")
+DB_PATH = Path(os.getenv("ROUTER_DB_PATH", DEFAULT_DB_PATH))
 STATIC_DIR = ROOT / "app" / "static"
 
 registry = ProviderRegistry(REGISTRY_PATH)
@@ -42,7 +45,7 @@ def env_bool(name: str, default: bool = False) -> bool:
 def configured(provider) -> bool:
     if provider.auth in {"none", "optional_bearer"} or provider.env_key is None:
         return True
-    return bool(os.getenv(provider.env_key))
+    return configured_value(store, provider.env_key)
 
 
 def route_flags(model: str) -> tuple[bool, bool]:
@@ -94,6 +97,10 @@ def setup_status() -> dict[str, Any]:
         "trial_enabled": env_bool("ROUTER_ALLOW_TRIAL"),
         "promo_enabled": env_bool("ROUTER_ALLOW_PROMO"),
         "transport": router.transport_mode,
+        "mode": "vercel-site" if IS_VERCEL else "local-platform",
+        "writable_setup": not IS_VERCEL,
+        "hosted_api_enabled": env_bool("ROUTER_ENABLE_HOSTED_API"),
+        "provider_setup": provider_setup_status(registry, store),
     }
 
 
@@ -162,7 +169,8 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+    page = "hosted.html" if IS_VERCEL else "index.html"
+    return FileResponse(STATIC_DIR / page)
 
 
 @app.get("/health")
@@ -175,6 +183,8 @@ async def health() -> dict[str, Any]:
         "registry_updated_at": registry.data.updated_at,
         "db": str(DB_PATH),
         "transport": router.transport_mode,
+        "mode": "vercel-site" if IS_VERCEL else "local-platform",
+        "hosted_api_enabled": env_bool("ROUTER_ENABLE_HOSTED_API"),
     }
 
 
@@ -190,6 +200,46 @@ async def setup_snippets(request: Request) -> dict[str, Any]:
         "snippets": client_snippets(public_base_url(request)),
         "virtual_models": sorted(VIRTUAL_MODELS),
     }
+
+
+@app.post("/api/setup/value")
+async def setup_value(
+    item: SetupValue,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    require_admin(authorization)
+    if IS_VERCEL:
+        raise HTTPException(
+            status_code=409,
+            detail="Browser setup is disabled on Vercel. Configure provider keys as Vercel environment variables.",
+        )
+    allowed = known_setup_keys(registry)
+    if item.key not in allowed:
+        raise HTTPException(status_code=400, detail="Unknown setup key")
+    store.set_secret(item.key, item.value.strip())
+    return {
+        "ok": True,
+        "key": item.key,
+        "configured": True,
+        "source": "local",
+    }
+
+
+@app.delete("/api/setup/value/{key}")
+async def delete_setup_value(
+    key: str,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    require_admin(authorization)
+    if IS_VERCEL:
+        raise HTTPException(
+            status_code=409,
+            detail="Browser setup is disabled on Vercel.",
+        )
+    if key not in known_setup_keys(registry):
+        raise HTTPException(status_code=400, detail="Unknown setup key")
+    store.delete_secret(key)
+    return {"ok": True, "key": key}
 
 
 @app.get("/v1/providers")
@@ -345,6 +395,15 @@ async def chat_completions(
     request: ChatCompletionRequest,
     response: Response,
 ):
+    if IS_VERCEL and not env_bool("ROUTER_ENABLE_HOSTED_API"):
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Hosted router API is disabled on this Vercel deployment. "
+                "Use the local one-command platform, or enable hosted mode only after configuring "
+                "provider credentials and a durable remote state backend."
+            ),
+        )
     allow_trial, allow_promo = route_flags(request.model)
 
     if request.stream:
