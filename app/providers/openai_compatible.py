@@ -7,7 +7,7 @@ from typing import Any, Callable
 
 import httpx
 
-from app.models import ChatCompletionRequest, ProviderSpec
+from app.models import ChatCompletionRequest, EmbeddingRequest, ProviderSpec
 from app.normalization import normalize_request_body
 from app.providers.base import ProviderAdapter, ProviderError
 
@@ -154,3 +154,87 @@ class OpenAICompatibleAdapter(ProviderAdapter):
                     yield chunk
         except httpx.HTTPError as exc:
             raise ProviderError(str(exc), None) from exc
+
+
+    async def embeddings(
+        self,
+        provider: ProviderSpec,
+        model: str,
+        request: EmbeddingRequest,
+    ) -> tuple[dict[str, Any], httpx.Headers]:
+        if (
+            provider.env_key
+            and provider.auth == "bearer"
+            and not self._api_key(provider)
+        ):
+            raise ProviderError(f"Missing API key: {provider.env_key}", 401)
+
+        payload = request.model_dump(exclude_none=True)
+        payload["model"] = self._model_id(provider, model)
+        try:
+            response = await self.client.post(
+                f"{self._base_url(provider)}/embeddings",
+                headers=self._headers(provider),
+                json=payload,
+            )
+        except httpx.HTTPError as exc:
+            raise ProviderError(str(exc), None) from exc
+
+        if response.status_code >= 400:
+            raise ProviderError(response.text[:1000], response.status_code)
+        try:
+            return response.json(), response.headers
+        except ValueError as exc:
+            raise ProviderError(
+                "Provider returned a non-JSON embedding response",
+                response.status_code,
+            ) from exc
+
+    async def transcription(
+        self,
+        provider: ProviderSpec,
+        model: str,
+        *,
+        filename: str,
+        data: bytes,
+        content_type: str,
+        language: str | None = None,
+        prompt: str | None = None,
+        response_format: str = "json",
+        temperature: float | None = None,
+    ) -> tuple[bytes, httpx.Headers, str]:
+        if (
+            provider.env_key
+            and provider.auth == "bearer"
+            and not self._api_key(provider)
+        ):
+            raise ProviderError(f"Missing API key: {provider.env_key}", 401)
+
+        headers = self._headers(provider)
+        headers.pop("Content-Type", None)
+        form: dict[str, str] = {
+            "model": self._model_id(provider, model),
+            "response_format": response_format,
+        }
+        if language:
+            form["language"] = language
+        if prompt:
+            form["prompt"] = prompt
+        if temperature is not None:
+            form["temperature"] = str(temperature)
+
+        try:
+            response = await self.client.post(
+                f"{self._base_url(provider)}/audio/transcriptions",
+                headers=headers,
+                data=form,
+                files={"file": (filename, data, content_type)},
+            )
+        except httpx.HTTPError as exc:
+            raise ProviderError(str(exc), None) from exc
+
+        if response.status_code >= 400:
+            raise ProviderError(response.text[:1000], response.status_code)
+        return response.content, response.headers, response.headers.get(
+            "content-type", "application/json"
+        )
