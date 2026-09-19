@@ -1,104 +1,234 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <meta name="description" content="The Router combines recurring free AI API capacity behind one OpenAI-compatible endpoint."/>
-  <title>The Router — Free AI capacity, one API</title>
-  <link rel="stylesheet" href="/static/hosted.css"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="The Router combines recurring free AI API capacity behind one OpenAI-compatible endpoint." />
+  <meta name="theme-color" content="#090a0c" />
+  <title>The Router — free AI capacity, one API</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/hosted.css" />
 </head>
 <body>
-  <header class="topbar">
-    <a class="brand" href="/"><span class="mark">R</span><span>The Router</span></a>
-    <nav>
-      <a href="#how">How it works</a>
-      <a href="#routes">Routes</a>
-      <a href="#deploy">Run it</a>
-      <a class="button small" href="https://github.com/m-techy/the-router-project">GitHub</a>
+  <main class="site">
+    <nav class="floating-nav">
+      <a class="site-brand" href="/">
+        <span class="site-mark">R</span>
+        <span>The Router</span>
+      </a>
+      <div class="nav-links">
+        <a href="#system">System</a>
+        <a href="#routes">Routes</a>
+        <a href="#run">Run locally</a>
+      </div>
+      <a class="button compact" href="https://github.com/m-techy/the-router-project" target="_blank" rel="noreferrer">GitHub</a>
     </nav>
-  </header>
 
-  <main>
-    <section class="hero-hosted">
+    <section class="hosted-hero">
       <div class="hero-copy">
-        <div class="pill">OPEN SOURCE · ZERO-COST FIRST</div>
-        <h1>Use all your legitimate free AI capacity through one API.</h1>
-        <p>The Router sits in front of recurring free tiers from multiple AI providers, tracks quota and health, and automatically chooses a working model for each request.</p>
+        <span class="eyebrow">OPEN-SOURCE · PERSONAL-FIRST</span>
+        <h1>Turn scattered free AI quotas into one dependable endpoint.</h1>
+        <p>
+          The Router connects recurring-free providers, tracks health and quota,
+          and automatically picks a working model—while your apps keep using a
+          familiar OpenAI-compatible API.
+        </p>
         <div class="hero-actions">
-          <a class="button" href="#deploy">Run locally</a>
-          <a class="button secondary" href="https://github.com/m-techy/the-router-project">View source</a>
+          <a class="button" href="#run">Run on your machine</a>
+          <a class="button secondary" href="https://github.com/m-techy/the-router-project" target="_blank" rel="noreferrer">Read the source</a>
         </div>
-        <div class="hosted-note"><strong>This Vercel deployment is the public project site.</strong> The full router is intentionally self-hosted today so provider credentials and quota state remain durable and under your control.</div>
-      </div>
-      <div class="terminal">
-        <div class="terminal-bar"><i></i><i></i><i></i><span>one command</span></div>
-        <pre><code>docker compose up --build</code></pre>
-        <div class="terminal-result">
-          <span>Dashboard</span><b>http://localhost:4010</b>
-          <span>OpenAI base URL</span><b>http://localhost:4010/v1</b>
-          <span>Default route</span><b>free/auto</b>
+        <div class="hero-note">
+          The full router is self-hosted by design. This Vercel deployment is the public
+          product surface; your provider keys and durable quota state stay on your machine.
         </div>
       </div>
-    </section>
 
-    <section class="metrics">
-      <div><strong>1</strong><span>OpenAI-compatible endpoint</span></div>
-      <div><strong>$0</strong><span>default routing target</span></div>
-      <div><strong>3</strong><span>separate free / promo / trial pools</span></div>
-      <div><strong>∞</strong><span>provider adapters over time</span></div>
-    </section>
-
-    <section id="how" class="section">
-      <div class="section-title"><span>HOW IT WORKS</span><h2>One control plane, many free pools.</h2></div>
-      <div class="cards">
-        <article><b>01</b><h3>Connect providers</h3><p>Start the container and add API keys from the browser Setup page. No config file is required for first use.</p></article>
-        <article><b>02</b><h3>Send a normal OpenAI request</h3><p>Your apps keep using familiar OpenAI SDKs and point at The Router instead of a single provider.</p></article>
-        <article><b>03</b><h3>Route by capability + quota</h3><p>The Router filters by tools, JSON, vision, coding, reasoning and context, then scores available free capacity.</p></article>
-        <article><b>04</b><h3>Fallback automatically</h3><p>Rate limits and provider failures trigger cooldowns and pre-response fallback to another eligible provider.</p></article>
+      <div class="hero-visual">
+        <div class="visual-window">
+          <div class="visual-bar"><i></i><i></i><i></i><span>router decision</span></div>
+          <div class="visual-command">
+            <span>model</span><code>free/auto</code>
+          </div>
+          <div class="decision-flow">
+            <div class="decision-source"><span>request</span><strong>Summarize 28K tokens</strong></div>
+            <div class="decision-router"><span>R</span></div>
+            <div class="decision-target active"><i></i><span>Cerebras</span><b>0.91</b></div>
+            <div class="decision-target"><i></i><span>Gemini</span><b>0.88</b></div>
+            <div class="decision-target"><i></i><span>Groq</span><b>0.82</b></div>
+          </div>
+          <div class="visual-footer"><span>$0 route selected</span><span>fallback ready</span></div>
+        </div>
       </div>
     </section>
 
-    <section id="routes" class="section split">
-      <div>
-        <div class="section-title"><span>VIRTUAL MODELS</span><h2>Ask for intent, not a vendor.</h2></div>
-        <p class="muted">Your application can stay independent of provider model names. The Router can evolve its underlying free catalog without forcing app changes.</p>
-      </div>
-      <div class="route-list">
-        <div><code>free/auto</code><span>balanced zero-cost routing</span></div>
-        <div><code>free/fast</code><span>favor observed latency</span></div>
-        <div><code>free/smart</code><span>favor model quality</span></div>
-        <div><code>free/code</code><span>coding-capable models</span></div>
-        <div><code>free/reasoning</code><span>reasoning-capable models</span></div>
-        <div><code>free/vision</code><span>multimodal-capable models</span></div>
-        <div><code>free/long</code><span>long-context models</span></div>
+    <section class="provider-marquee" aria-label="Provider ecosystem">
+      <div class="marquee-track">
+        <span>Gemini</span><span>Groq</span><span>Cerebras</span><span>Mistral</span><span>Cloudflare</span><span>OpenRouter</span><span>Z.AI</span><span>SiliconFlow</span><span>NVIDIA</span><span>SambaNova</span>
+        <span>Gemini</span><span>Groq</span><span>Cerebras</span><span>Mistral</span><span>Cloudflare</span><span>OpenRouter</span><span>Z.AI</span><span>SiliconFlow</span><span>NVIDIA</span><span>SambaNova</span>
       </div>
     </section>
 
-    <section class="section">
-      <div class="section-title"><span>PLATFORM</span><h2>Everything needed for personal use lives in the web console.</h2></div>
-      <div class="feature-grid">
-        <div><h3>Setup wizard</h3><p>Add or remove provider credentials locally from the browser.</p></div>
-        <div><h3>Playground</h3><p>Preview route candidates and test prompts before integrating an app.</p></div>
-        <div><h3>Provider health</h3><p>See configured pools, certification state, quota headroom and model inventory.</p></div>
-        <div><h3>Usage traces</h3><p>Inspect each provider attempt and fallback chain persisted in SQLite.</p></div>
-        <div><h3>Upstream watch</h3><p>Track fixes and provider changes from Bifrost, LiteLLM, free-coding-models and China-focused gateways.</p></div>
-        <div><h3>Promo isolation</h3><p>Temporary offers never silently replace the recurring-free baseline.</p></div>
+    <section id="system" class="chapter">
+      <div class="chapter-heading">
+        <span class="eyebrow">THE CONTROL PLANE</span>
+        <h2>More free capacity without wiring every provider into every project.</h2>
+      </div>
+
+      <div class="bento">
+        <article class="bento-card bento-main">
+          <div>
+            <span class="card-kicker">Routing intelligence</span>
+            <h3>Capability first. Then quota, health, quality, and latency.</h3>
+            <p>Requests are filtered before scoring, so a vision request cannot accidentally land on a text-only model.</p>
+          </div>
+          <div class="score-stack">
+            <span style="--score:92%"><b>Cerebras</b><i></i><small>0.92</small></span>
+            <span style="--score:86%"><b>Gemini</b><i></i><small>0.86</small></span>
+            <span style="--score:74%"><b>Groq</b><i></i><small>0.74</small></span>
+          </div>
+        </article>
+
+        <article class="bento-card bento-quota">
+          <span class="card-kicker">Free-tier discipline</span>
+          <strong>$0</strong>
+          <p><code>free/*</code> never silently opts into trial or promotional pools.</p>
+        </article>
+
+        <article class="bento-card bento-trace">
+          <span class="card-kicker">Fallback traces</span>
+          <div class="trace-line"><i class="fail"></i><span>Groq · 429</span></div>
+          <div class="trace-line"><i class="pass"></i><span>Cerebras · 241 ms</span></div>
+          <p>See every provider attempt instead of guessing why a request moved.</p>
+        </article>
+
+        <article class="bento-card bento-setup">
+          <span class="card-kicker">Browser setup</span>
+          <h3>Paste keys once.</h3>
+          <p>Connect providers from the local dashboard or keep credentials in environment variables.</p>
+        </article>
+
+        <article class="bento-card bento-catalog">
+          <span class="card-kicker">Living catalog</span>
+          <h3>Upstream changes enter a review queue, not production.</h3>
+          <p>free-coding-models and gateway projects help discovery; reviewed metadata decides routing.</p>
+        </article>
       </div>
     </section>
 
-    <section id="deploy" class="section install">
-      <div>
-        <div class="section-title"><span>RUN THE ROUTER</span><h2>Start with Docker. Configure in the browser.</h2></div>
-        <ol>
-          <li>Clone the repository.</li>
-          <li>Run <code>docker compose up --build</code>.</li>
-          <li>Open <code>http://localhost:4010</code>.</li>
-          <li>Use <strong>Setup</strong> to connect recurring-free providers.</li>
-          <li>Use the generated SDK snippet in any hobby project.</li>
-        </ol>
+    <section class="story-section">
+      <div class="story-pin">
+        <span class="eyebrow">WHY ROUTING MATTERS</span>
+        <h2>Free APIs become useful when failure is expected, not exceptional.</h2>
+        <p>One provider can throttle, rename a model, or change a free tier. Your app should not need to care.</p>
       </div>
-      <div class="code-card">
-        <div class="code-title">Python</div>
+
+      <div class="story-cards">
+        <article class="story-card visual-frame">
+          <img src="https://picsum.photos/seed/network-routing/1200/760" alt="" />
+          <div class="story-overlay">
+            <strong>A provider hits 429.</strong>
+            <p>The model cools down; the router continues down the ranked candidate list.</p>
+          </div>
+        </article>
+        <article class="story-card visual-frame">
+          <img src="https://picsum.photos/seed/model-infrastructure/1200/760" alt="" />
+          <div class="story-overlay">
+            <strong>A compatibility facade rejects a feature.</strong>
+            <p>Gemini can fall back from its OpenAI-compatible surface to the native REST API.</p>
+          </div>
+        </article>
+        <article class="story-card visual-frame">
+          <img src="https://picsum.photos/seed/data-console/1200/760" alt="" />
+          <div class="story-overlay">
+            <strong>An upstream catalog changes.</strong>
+            <p>The dashboard surfaces the diff for review instead of silently changing your routes.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="routes" class="chapter">
+      <div class="chapter-heading route-heading">
+        <span class="eyebrow">VIRTUAL ROUTES</span>
+        <h2>Ask for the outcome. Let the router choose the vendor.</h2>
+      </div>
+
+      <div class="hosted-accordion" role="tablist">
+        <button type="button" class="route-panel active" data-route-panel="auto">
+          <span>free/auto</span>
+          <strong>Balanced</strong>
+          <p>Quality, free headroom, health, and observed latency.</p>
+        </button>
+        <button type="button" class="route-panel" data-route-panel="fast">
+          <span>free/fast</span>
+          <strong>Responsive</strong>
+          <p>Bias toward models that have been fast and reliable recently.</p>
+        </button>
+        <button type="button" class="route-panel" data-route-panel="smart">
+          <span>free/smart</span>
+          <strong>Quality</strong>
+          <p>Spend free capacity on the strongest eligible models first.</p>
+        </button>
+        <button type="button" class="route-panel" data-route-panel="code">
+          <span>free/code</span>
+          <strong>Code-aware</strong>
+          <p>Filter for coding-capable models before ranking candidates.</p>
+        </button>
+      </div>
+    </section>
+
+    <section class="chapter story-carousel-section">
+      <div class="chapter-heading">
+        <span class="eyebrow">ROUTING STORIES</span>
+        <h2>What the gateway should handle so your app does not.</h2>
+      </div>
+      <div class="carousel-shell">
+        <button type="button" class="carousel-arrow" id="storyPrev" aria-label="Previous routing story">←</button>
+        <div class="carousel-window">
+          <div class="carousel-track" id="storyTrack">
+            <article class="carousel-slide">
+              <blockquote>“I want a side project to use AI without becoming another monthly bill.”</blockquote>
+              <p>Default to recurring-free pools and expose exactly which provider handled the request.</p>
+            </article>
+            <article class="carousel-slide">
+              <blockquote>“A provider is fast today and throttled tomorrow.”</blockquote>
+              <p>Observed health and cooldown state belong in the router, not hard-coded in your app.</p>
+            </article>
+            <article class="carousel-slide">
+              <blockquote>“A new free model appears for a week.”</blockquote>
+              <p>Promotional capacity can be opt-in without contaminating the persistent-free baseline.</p>
+            </article>
+          </div>
+        </div>
+        <button type="button" class="carousel-arrow" id="storyNext" aria-label="Next routing story">→</button>
+      </div>
+    </section>
+
+    <section id="run" class="run-chapter">
+      <div class="run-copy">
+        <span class="eyebrow">RUN IT YOUR WAY</span>
+        <h2>Lightweight native process or isolated Docker container.</h2>
+        <p>The native launcher is the everyday choice for personal use. Docker stays available when you want repeatable isolation or optional gateway sidecars.</p>
+
+        <div class="run-tabs">
+          <button type="button" class="run-tab active" data-run-tab="native">Native</button>
+          <button type="button" class="run-tab" data-run-tab="docker">Docker</button>
+        </div>
+
+        <div class="run-code active" data-run-content="native">
+          <div><span>Windows</span><code>start.bat</code><button type="button" class="copy-command" data-copy="start.bat">Copy</button></div>
+          <div><span>macOS / Linux</span><code>./start.sh</code><button type="button" class="copy-command" data-copy="./start.sh">Copy</button></div>
+        </div>
+
+        <div class="run-code" data-run-content="docker">
+          <div><span>Docker</span><code>docker compose up -d --build</code><button type="button" class="copy-command" data-copy="docker compose up -d --build">Copy</button></div>
+        </div>
+      </div>
+
+      <div class="sdk-card">
+        <div class="sdk-head"><span>Python</span><b>http://localhost:4010/v1</b></div>
         <pre><code>from openai import OpenAI
 
 client = OpenAI(
@@ -106,26 +236,33 @@ client = OpenAI(
     api_key="local",
 )
 
-r = client.chat.completions.create(
+response = client.chat.completions.create(
     model="free/auto",
-    messages=[
-        {"role": "user", "content": "Hello"}
-    ],
-)
-
-print(r.choices[0].message.content)</code></pre>
+    messages=[{"role": "user", "content": "Hello"}],
+)</code></pre>
       </div>
     </section>
 
-    <section class="section hosted-architecture">
-      <div class="section-title"><span>WHY NOT HOST THE FULL ROUTER HERE?</span><h2>Vercel is great for the project site; durable routing state needs a database.</h2></div>
-      <p>FastAPI and streaming can run on Vercel, but this self-hosted version uses a local SQLite quota ledger and local credential store. Vercel Function filesystems are not the durable state layer we want for a multi-provider router. A future hosted mode can use Postgres/Redis or another durable backend, while the free self-hosted platform stays simple.</p>
+    <section class="final-cta">
+      <h2>Keep the API simple.<br />Make the routing layer smarter.</h2>
+      <div>
+        <a class="button" href="https://github.com/m-techy/the-router-project" target="_blank" rel="noreferrer">Clone The Router</a>
+        <a class="text-link" href="#run">Local setup guide</a>
+      </div>
     </section>
+
+    <footer>
+      <a class="site-brand" href="/"><span class="site-mark">R</span><span>The Router</span></a>
+      <p>Personal-first, open-source AI routing.</p>
+      <a href="https://github.com/m-techy/the-router-project" target="_blank" rel="noreferrer">GitHub repository →</a>
+    </footer>
   </main>
 
-  <footer>
-    <span>The Router · personal-first, open-source AI routing</span>
-    <a href="https://github.com/m-techy/the-router-project">GitHub repository →</a>
-  </footer>
+  <div id="hostedToast" class="hosted-toast" aria-live="polite"></div>
+
+  <script src="/static/hosted.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js" defer></script>
+  <script src="/static/motion.js" defer></script>
 </body>
 </html>
