@@ -8,6 +8,7 @@ from typing import Any, Callable
 import httpx
 
 from app.models import ChatCompletionRequest, ProviderSpec
+from app.normalization import normalize_request_body
 from app.providers.base import ProviderAdapter, ProviderError
 
 
@@ -86,7 +87,7 @@ class OpenAICompatibleAdapter(ProviderAdapter):
     ) -> dict[str, Any]:
         body = request.model_dump(exclude_none=True)
         body["model"] = self._model_id(provider, model)
-        return body
+        return normalize_request_body(provider.id, body)
 
     async def chat(
         self,
