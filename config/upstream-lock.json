@@ -1,0 +1,47 @@
+{
+  "vava-nessa/free-coding-models": {
+    "sha": "0893afaa48cb9d80b1c337e3514286ed928b3940",
+    "date": "2026-09-15T16:01:33Z",
+    "message": "0.5.92 provider audit"
+  },
+  "maximhq/bifrost": {
+    "sha": "94fb9ee2922cde1142129a094ce10ac34627036f",
+    "date": "2026-09-19T12:05:09Z",
+    "message": "routing fixes"
+  },
+  "QuantumNous/new-api": {
+    "sha": "972aed1972820389ea0b603ca58f03f846fbf790",
+    "date": "2026-09-19T05:51:18Z",
+    "message": "response model mismatch fix"
+  },
+  "songquanpeng/one-api": {
+    "sha": "8df4a2670b98266bd287c698243fff327d9748cf",
+    "date": "2025-02-21T11:30:16Z",
+    "message": "Doubao docs update"
+  },
+  "BerriAI/litellm": {
+    "sha": "8c4c394ecc82c4d6acb5eb371d8781e487894a17",
+    "date": "2026-09-19T13:45:46Z",
+    "message": "DeepSeek pricing fix"
+  },
+  "DevvGwardo/free-llm-router": {
+    "sha": "6efd5cbcd4afaf40003a075a45ae3b385d408db2",
+    "date": "2026-05-06T19:02:48Z",
+    "message": "Hermes integration"
+  },
+  "alienz-dev/llm-router": {
+    "sha": "4b912d7036194a6f9e7f810621ab3247303409c7",
+    "date": "2026-08-30T02:41:33Z",
+    "message": "agent-ready changes"
+  },
+  "spacepirate15/quantum-free-router": {
+    "sha": "08ccded39bfafc59105da2756bc355bc64e8a634",
+    "date": "2026-06-11T08:52:48Z",
+    "message": "router docs/tooling"
+  },
+  "DeepakSilaych/free-api-gateway": {
+    "sha": "91607a2ca47c3c15b7a975dff99f947ec5a7ef8b",
+    "date": "2026-09-08T16:35:55Z",
+    "message": "README from code"
+  }
+}
