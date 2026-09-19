@@ -5,6 +5,7 @@ from app.models import ChatCompletionRequest, ChatMessage
 from app.providers.base import ProviderError
 from app.providers.gemini import (
     GeminiHybridAdapter,
+    _embedding_contents,
     build_native_payload,
     native_response_to_openai,
 )
@@ -96,6 +97,41 @@ def test_native_payload_maps_inline_image():
     assert parts[0]["text"] == "Describe this."
     assert parts[1]["inlineData"]["mimeType"] == "image/png"
     assert parts[1]["inlineData"]["data"] == "aGVsbG8="
+
+
+def test_embedding_normalizer_maps_text_image_and_audio_parts():
+    contents = _embedding_contents(
+        [
+            {"type": "text", "text": "Represent this scene"},
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": "data:image/png;base64,aGVsbG8="
+                },
+            },
+            {
+                "type": "input_audio",
+                "input_audio": {
+                    "format": "wav",
+                    "data": "aGVsbG8=",
+                },
+            },
+        ]
+    )
+
+    assert len(contents) == 1
+    parts = contents[0]
+    assert parts[0]["text"] == "Represent this scene"
+    assert parts[1]["inlineData"]["mimeType"] == "image/png"
+    assert parts[1]["inlineData"]["data"] == "aGVsbG8="
+    assert parts[2]["inlineData"]["mimeType"] == "audio/wav"
+
+
+def test_embedding_normalizer_treats_string_list_as_batch():
+    contents = _embedding_contents(["first", "second", "third"])
+
+    assert len(contents) == 3
+    assert [item[0]["text"] for item in contents] == ["first", "second", "third"]
 
 
 def test_native_response_maps_text_tools_and_usage():
