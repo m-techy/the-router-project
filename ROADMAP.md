@@ -21,14 +21,14 @@
 - [x] copyable Python, JavaScript, and cURL client snippets
 - [x] request trace view with fallback chain
 - [x] provider signup/docs links in the dashboard
-- [ ] provider-specific /models discovery with zero-price filtering where pricing metadata exists
-- [ ] authoritative quota fetchers for providers that expose usage/balance endpoints
-- [ ] model-level cooldown/health instead of provider-only runtime state
-- [ ] schema normalizers for known Z.AI/Mistral/tool-call edge cases
+- [x] provider-specific /models discovery with zero-price filtering where pricing metadata exists
+- [x] authoritative quota fetcher framework; OpenRouter active telemetry added, retired SiliconFlow endpoint intentionally excluded
+- [x] model-level cooldown/health instead of provider-only runtime state
+- [x] schema normalizers for known Z.AI/Mistral/NVIDIA/tool-call edge cases
 - [ ] native Gemini adapter fallback when OpenAI compatibility loses required functionality
 - [ ] better Cloudflare neuron telemetry
-- [ ] automatic promotional expiry timestamps
-- [ ] provider/model change review screen in the dashboard
+- [x] automatic promotional expiry enforcement when upstream expiry metadata exists
+- [x] provider/model change review screen in the dashboard
 
 ## v0.4 — more modalities
 - [ ] /v1/embeddings
@@ -42,7 +42,7 @@
 - [ ] live event stream
 - [ ] per-project local router keys and usage limits
 - [ ] export/import config with secrets excluded by default
-- [ ] provider configuration writes through the dashboard without exposing secrets
+- [x] provider configuration writes through the local dashboard without exposing secrets
 
 ## v1.0
 - [ ] one-command installers for Linux/macOS/Windows
