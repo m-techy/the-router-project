@@ -8,6 +8,8 @@
     setup: null,
     snippets: null,
     catalog: null,
+    projects: null,
+    newProjectKey: null,
     activeSnippet: "python",
     currentView: "overview",
   };
@@ -15,6 +17,7 @@
   const VIEW_META = {
     overview: ["Overview", "Free capacity at a glance."],
     setup: ["Setup", "Connect providers and configure this router."],
+    projects: ["Projects", "Local router keys and daily usage limits."],
     guide: ["Guide", "Run, configure, test, and integrate."],
     providers: ["Providers", "Quota, health, models, and live probes."],
     playground: ["Playground", "Test routing before changing your app."],
@@ -322,6 +325,20 @@
       );
     }
 
+    const vault = setup.vault || {};
+    const projectState = setup.projects || {};
+    const vaultSummary = $("#vaultSummary");
+    if (vaultSummary) {
+      vaultSummary.textContent = vault.enabled
+        ? `Vault on · ${vault.encrypted_secrets || 0}/${vault.stored_secrets || 0} stored secrets encrypted`
+        : `Vault off · ${vault.stored_secrets || 0} local secrets stored without vault encryption`;
+    }
+    if (projectState.enforced) {
+      $("#projectEnforcement")?.replaceChildren(
+        document.createTextNode("Project keys enforced")
+      );
+    }
+
     renderSnippet();
   }
 
@@ -456,6 +473,58 @@
       : '<div class="success-box">Reviewed registry and upstream snapshot are aligned.</div>';
   }
 
+  function renderProjects() {
+    const host = $("#projectList");
+    if (!host) return;
+
+    if (!state.projects) {
+      host.innerHTML =
+        '<div class="empty-state">Project management is unavailable. If ROUTER_ADMIN_KEY is set, use the admin API directly.</div>';
+      return;
+    }
+
+    $("#projectEnforcement").textContent = state.projects.enforced
+      ? "Project keys enforced"
+      : "Legacy local access enabled";
+
+    const projects = state.projects.projects || [];
+    host.innerHTML = projects.length
+      ? projects
+          .map((project) => {
+            const usage = project.usage_today || {};
+            const requestLimit = project.daily_request_limit;
+            const tokenLimit = project.daily_token_limit;
+            const requestText = requestLimit
+              ? `${fmt(usage.requests)}/${fmt(requestLimit)} requests`
+              : `${fmt(usage.requests)} requests · unlimited`;
+            const tokenText = tokenLimit
+              ? `${fmt(usage.tokens)}/${fmt(tokenLimit)} tokens`
+              : `${fmt(usage.tokens)} tokens · unlimited`;
+            return `
+              <article class="project-row">
+                <div class="project-identity">
+                  <strong>${esc(project.name)}</strong>
+                  <span>${esc(project.id)} · ${esc(project.key_prefix)}…</span>
+                </div>
+                <div class="project-usage">
+                  <span>${esc(requestText)}</span>
+                  <span>${esc(tokenText)}</span>
+                </div>
+                <div class="project-state">
+                  <span class="status-word ${project.enabled ? "ready" : "missing"}">
+                    ${project.enabled ? "active" : "disabled"}
+                  </span>
+                </div>
+                <button type="button" class="row-action project-delete" data-project="${esc(project.id)}">
+                  revoke
+                </button>
+              </article>
+            `;
+          })
+          .join("")
+      : '<div class="empty-state">No project keys yet. Create one above for an app that should have its own limit.</div>';
+  }
+
   function renderUsage(summary) {
     const totals = summary.totals || {};
     $("#usageStats").innerHTML =
@@ -571,9 +640,10 @@
         api("/api/setup/status"),
         api("/api/setup/snippets"),
         api("/api/catalog/reconciliation"),
+        api("/api/projects"),
       ]);
 
-      const [health, providers, usage, summary, setup, snippets, catalog] =
+      const [health, providers, usage, summary, setup, snippets, catalog, projects] =
         results.map((result) =>
           result.status === "fulfilled" ? result.value : null,
         );
@@ -588,6 +658,7 @@
       state.setup = setup || {};
       state.snippets = snippets || {};
       state.catalog = catalog || { available: false };
+      state.projects = projects;
 
       $("#healthDot").classList.add("online");
       $("#healthLabel").textContent =
@@ -598,6 +669,7 @@
       renderProviders();
       renderUsage(summary || { totals: {} });
       renderCatalog();
+      renderProjects();
     } catch (error) {
       $("#healthDot").classList.remove("online");
       $("#healthLabel").textContent = "Router unavailable";
@@ -698,6 +770,23 @@
         await loadTrace(trace.dataset.request);
         return;
       }
+
+      const projectDelete = event.target.closest(".project-delete");
+      if (projectDelete) {
+        projectDelete.disabled = true;
+        try {
+          await api(`/api/projects/${encodeURIComponent(projectDelete.dataset.project)}`, {
+            method: "DELETE",
+          });
+          toast("Project key revoked", "good");
+          await refresh();
+        } catch (error) {
+          toast(error.message || "Could not revoke project", "bad");
+        } finally {
+          projectDelete.disabled = false;
+        }
+        return;
+      }
     });
 
     $("#refreshBtn").addEventListener("click", refresh);
@@ -718,6 +807,89 @@
     $("#copySnippet").addEventListener("click", () =>
       copyText($("#snippetCode").textContent, "Snippet copied"),
     );
+
+    $("#copyProjectKey").addEventListener("click", () => {
+      const value = $("#newProjectKeyValue").textContent;
+      if (value) copyText(value, "Project key copied");
+    });
+
+    $("#createProject").addEventListener("click", async () => {
+      const button = $("#createProject");
+      const name = $("#projectName").value.trim();
+      if (!name) {
+        toast("Enter a project name", "neutral");
+        return;
+      }
+
+      const requests = Number($("#projectRequestLimit").value || 0);
+      const tokens = Number($("#projectTokenLimit").value || 0);
+      button.disabled = true;
+      try {
+        const created = await api("/api/projects", {
+          method: "POST",
+          body: JSON.stringify({
+            name,
+            daily_request_limit: requests > 0 ? requests : null,
+            daily_token_limit: tokens > 0 ? tokens : null,
+          }),
+        });
+        state.newProjectKey = created.key;
+        $("#newProjectKeyValue").textContent = created.key;
+        $("#newProjectKey").hidden = false;
+        $("#projectName").value = "";
+        $("#projectRequestLimit").value = "";
+        $("#projectTokenLimit").value = "";
+        toast("Project key created — copy it now", "good");
+        await refresh();
+      } catch (error) {
+        toast(error.message || "Could not create project", "bad");
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    $("#exportConfig").addEventListener("click", async () => {
+      try {
+        const payload = await api("/api/config/export");
+        const blob = new Blob([JSON.stringify(payload, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "the-router-config.json";
+        link.click();
+        URL.revokeObjectURL(url);
+        toast("Config exported without secret values", "good");
+      } catch (error) {
+        toast(error.message || "Could not export config", "bad");
+      }
+    });
+
+    $("#importConfig").addEventListener("click", () => {
+      $("#importConfigFile").click();
+    });
+
+    $("#importConfigFile").addEventListener("change", async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      try {
+        const payload = JSON.parse(await file.text());
+        const result = await api("/api/config/import", {
+          method: "POST",
+          body: JSON.stringify({
+            version: payload.version || 1,
+            settings: payload.settings || {},
+          }),
+        });
+        toast(`${result.settings_imported || 0} settings imported`, "good");
+        await refresh();
+      } catch (error) {
+        toast(error.message || "Could not import config", "bad");
+      } finally {
+        event.target.value = "";
+      }
+    });
 
     $("#previewRoute").addEventListener("click", async () => {
       const box = $("#routePreview");
@@ -796,6 +968,23 @@
     });
   }
 
+  let liveSource = null;
+  let liveRefreshTimer = null;
+
+  function startLiveEvents() {
+    if (!("EventSource" in window) || liveSource) return;
+    liveSource = new EventSource("/api/events");
+    liveSource.addEventListener("usage", () => {
+      window.clearTimeout(liveRefreshTimer);
+      liveRefreshTimer = window.setTimeout(() => {
+        refresh();
+      }, 500);
+    });
+    liveSource.onerror = () => {
+      // EventSource reconnects automatically. Manual refresh remains available.
+    };
+  }
+
   function boot() {
     $("#baseUrl").textContent = `${location.origin}/v1`;
     wireStaticActions();
@@ -805,7 +994,7 @@
       setView(initialView);
     }
 
-    refresh();
+    refresh().then(startLiveEvents);
   }
 
   if (document.readyState === "loading") {
