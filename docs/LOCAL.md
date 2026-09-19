@@ -7,6 +7,20 @@ The Router has two local run methods:
 1. **Native Python — recommended for personal use.** Lowest overhead.
 2. **Docker — optional.** Better isolation and reproducibility.
 
+For a fresh machine, the one-command installers clone/update the project and then use the same native launcher:
+
+macOS / Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/m-techy/the-router-project/main/install.sh | bash
+```
+
+Windows PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/m-techy/the-router-project/main/install.ps1 | iex
+```
+
 "Local" means the router process runs on your computer. Cloud AI providers still require internet access.
 
 ## Method 1 — native Python
