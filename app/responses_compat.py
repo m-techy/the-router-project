@@ -29,8 +29,14 @@ def _response_content_to_chat(content: Any) -> Any:
                 url = url.get("url")
             if url:
                 parts.append({"type": "image_url", "image_url": {"url": str(url)}})
+                continue
+            if item.get("file_id"):
+                raise ValueError(
+                    "Responses input_image file_id is not supported; provide image_url instead."
+                )
+            raise ValueError("Responses image input is missing image_url.")
         else:
-            parts.append({"type": "text", "text": json.dumps(item, ensure_ascii=False)})
+            raise ValueError(f"Responses content part type {kind!r} is not supported.")
     return parts
 
 
@@ -97,6 +103,8 @@ def response_request_to_chat(request: ResponseCreateRequest) -> ChatCompletionRe
         raise ValueError("Responses conversations are not supported by the stateless router.")
     if request.background:
         raise ValueError("Background Responses jobs are not supported.")
+    if request.store is True:
+        raise ValueError("store=true is not supported by the stateless router.")
 
     messages: list[ChatMessage] = []
     if request.instructions:
@@ -121,6 +129,10 @@ def response_request_to_chat(request: ResponseCreateRequest) -> ChatCompletionRe
                 )
             elif kind == "function_call":
                 call_id = str(item.get("call_id") or item.get("id") or "")
+                if not call_id or not item.get("name"):
+                    raise ValueError(
+                        "Responses function_call requires call_id/id and name."
+                    )
                 messages.append(
                     ChatMessage(
                         role="assistant",
@@ -138,19 +150,21 @@ def response_request_to_chat(request: ResponseCreateRequest) -> ChatCompletionRe
                     )
                 )
             elif kind == "function_call_output":
+                call_id = str(item.get("call_id") or item.get("id") or "")
+                if not call_id:
+                    raise ValueError(
+                        "Responses function_call_output requires call_id/id."
+                    )
                 messages.append(
                     ChatMessage(
                         role="tool",
-                        tool_call_id=str(item.get("call_id") or item.get("id") or ""),
+                        tool_call_id=call_id,
                         content=item.get("output", ""),
                     )
                 )
             else:
-                messages.append(
-                    ChatMessage(
-                        role="user",
-                        content=json.dumps(item, ensure_ascii=False),
-                    )
+                raise ValueError(
+                    f"Responses input item type {kind!r} is not supported."
                 )
     else:
         messages.append(ChatMessage(role="user", content=request.input))
