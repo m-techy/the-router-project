@@ -9,10 +9,12 @@ import httpx
 
 from app.models import ChatCompletionRequest, EmbeddingRequest, ProviderSpec
 from app.normalization import normalize_request_body
-from app.providers.base import ProviderAdapter, ProviderError
+from app.providers.base import AdapterCapabilities, ProviderAdapter, ProviderError
 
 
 class OpenAICompatibleAdapter(ProviderAdapter):
+    capabilities = AdapterCapabilities(embeddings=True, transcription=True)
+
     def __init__(
         self,
         client: httpx.AsyncClient,
