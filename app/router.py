@@ -17,6 +17,7 @@ from .providers.sdk import validate_adapter
 from .quota import QuotaManager
 from .registry import ProviderRegistry, model_is_current
 from .route_profiles import ROUTE_PROFILE_PREFIX, RouteProfile, load_route_profiles
+from .stream_usage import OpenAIStreamUsageMeter
 
 VIRTUAL_MODELS = {
     "free/auto",
@@ -352,7 +353,14 @@ class FreeRouter:
         *,
         allow_trial: bool,
         allow_promo: bool,
-    ) -> tuple[AsyncIterator[bytes], str, str, int, str]:
+    ) -> tuple[
+        AsyncIterator[bytes],
+        str,
+        str,
+        int,
+        str,
+        OpenAIStreamUsageMeter,
+    ]:
         candidates = self.candidates(request, allow_trial=allow_trial, allow_promo=allow_promo)
         if not candidates:
             raise RuntimeError("No eligible configured free provider/model is currently available")
@@ -368,6 +376,8 @@ class FreeRouter:
                 first = await anext(iterator)
                 first_latency = (time.perf_counter() - started) * 1000
 
+                meter = OpenAIStreamUsageMeter(estimate_tokens(request))
+
                 async def wrapped(
                     first_chunk: bytes = first,
                     upstream: AsyncIterator[bytes] = iterator,
@@ -376,24 +386,52 @@ class FreeRouter:
                     fallback_count: int = index,
                     latency_ms: float = first_latency,
                 ) -> AsyncIterator[bytes]:
-                    completed = False
+                    stream_error: ProviderError | None = None
                     try:
+                        meter.feed(first_chunk)
                         yield first_chunk
                         async for chunk in upstream:
+                            meter.feed(chunk)
                             yield chunk
-                        completed = True
+                    except ProviderError as exc:
+                        stream_error = exc
+                        raise
                     finally:
-                        if completed:
+                        meter.flush()
+                        usage = meter.usage()
+                        if stream_error is None:
                             self.quota.record_success(
                                 selected_provider.id,
                                 model_id=selected_candidate.model_id,
                                 request_id=request_id,
-                                total_tokens=0,
+                                prompt_tokens=usage.prompt_tokens,
+                                completion_tokens=usage.completion_tokens,
+                                total_tokens=usage.total_tokens,
                                 latency_ms=latency_ms,
                                 fallback_count=fallback_count,
                             )
+                        else:
+                            self.quota.record_failure(
+                                selected_provider.id,
+                                model_id=selected_candidate.model_id,
+                                request_id=request_id,
+                                status_code=stream_error.status_code,
+                                prompt_tokens=usage.prompt_tokens,
+                                completion_tokens=usage.completion_tokens,
+                                total_tokens=usage.total_tokens,
+                                latency_ms=latency_ms,
+                                fallback_count=fallback_count,
+                                error=str(stream_error),
+                            )
 
-                return wrapped(), provider.id, candidate.model_id, index, candidate.reason
+                return (
+                    wrapped(),
+                    provider.id,
+                    candidate.model_id,
+                    index,
+                    candidate.reason,
+                    meter,
+                )
             except (ProviderError, StopAsyncIteration) as exc:
                 latency = (time.perf_counter() - started) * 1000
                 status = exc.status_code if isinstance(exc, ProviderError) else None
