@@ -74,6 +74,10 @@ CREATE INDEX IF NOT EXISTS idx_project_usage_project_ts
 
 
 class StateStore:
+    backend_name = "sqlite"
+    durable = True
+    serverless_safe = False
+
     def __init__(self, path: str | Path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
