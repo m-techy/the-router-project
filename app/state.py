@@ -27,6 +27,17 @@ CREATE TABLE IF NOT EXISTS provider_runtime (
  provider_quota_json TEXT, updated_at REAL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS model_runtime (
+ provider_id TEXT NOT NULL,
+ model_id TEXT NOT NULL,
+ blocked_until REAL NOT NULL DEFAULT 0,
+ successes INTEGER NOT NULL DEFAULT 0,
+ failures INTEGER NOT NULL DEFAULT 0,
+ latency_ema_ms REAL,
+ updated_at REAL NOT NULL,
+ PRIMARY KEY(provider_id, model_id)
+);
+
 CREATE TABLE IF NOT EXISTS settings (
  key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at REAL NOT NULL
 );
@@ -180,6 +191,60 @@ class StateStore:
         with self._lock:
             rows = self._conn.execute(
                 "SELECT * FROM provider_runtime ORDER BY provider_id"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_model_runtime(self, provider_id: str, model_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM model_runtime WHERE provider_id=? AND model_id=?",
+                (provider_id, model_id),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def upsert_model_runtime(
+        self,
+        provider_id: str,
+        model_id: str,
+        **values: Any,
+    ) -> None:
+        old = self.get_model_runtime(provider_id, model_id) or {}
+        data = {
+            "blocked_until": old.get("blocked_until", 0),
+            "successes": old.get("successes", 0),
+            "failures": old.get("failures", 0),
+            "latency_ema_ms": old.get("latency_ema_ms"),
+        }
+        data.update(values)
+        data["updated_at"] = time.time()
+        with self._lock, self._conn:
+            self._conn.execute(
+                """
+                INSERT INTO model_runtime(
+                    provider_id,model_id,blocked_until,successes,failures,latency_ema_ms,updated_at
+                ) VALUES(?,?,?,?,?,?,?)
+                ON CONFLICT(provider_id,model_id) DO UPDATE SET
+                    blocked_until=excluded.blocked_until,
+                    successes=excluded.successes,
+                    failures=excluded.failures,
+                    latency_ema_ms=excluded.latency_ema_ms,
+                    updated_at=excluded.updated_at
+                """,
+                (
+                    provider_id,
+                    model_id,
+                    data["blocked_until"],
+                    data["successes"],
+                    data["failures"],
+                    data["latency_ema_ms"],
+                    data["updated_at"],
+                ),
+            )
+
+    def all_model_runtime(self) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM model_runtime ORDER BY provider_id, model_id"
             ).fetchall()
         return [dict(r) for r in rows]
 
