@@ -8,3 +8,4 @@ data/
 runtime/
 upstream-report.md
 .DS_Store
+dist/
