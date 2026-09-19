@@ -22,7 +22,7 @@
       <div class="site-links">
         <a href="#system">System</a>
         <a href="#routing">Routing</a>
-        <a href="#run">Run local</a>
+        <a href="#run">Run / deploy</a>
       </div>
 
       <a class="nav-cta" href="https://github.com/m-techy/the-router-project" target="_blank" rel="noreferrer">GitHub ↗</a>
@@ -37,7 +37,7 @@
           capability, quota, health, latency, and fallback across providers.
         </p>
         <div class="hero-actions">
-          <a class="primary-cta" href="#run">Run on your machine</a>
+          <a class="primary-cta" href="#run">Run local first</a>
           <a class="secondary-cta" href="https://github.com/m-techy/the-router-project" target="_blank" rel="noreferrer">Explore the code</a>
         </div>
       </div>
@@ -107,10 +107,10 @@
 
         <article class="bento local-card">
           <div>
-            <span>Local-first</span>
-            <h3>Chat, embeddings, transcription, project keys, and durable router state stay under your control.</h3>
+            <span>Local-first · hosted by deliberate opt-in</span>
+            <h3>SQLite stays the default. Durable PostgreSQL can power an authenticated hosted router when every security gate passes.</h3>
           </div>
-          <code>http://localhost:4010/v1</code>
+          <code>GET /api/hosted/readiness</code>
         </article>
       </div>
     </section>
@@ -219,25 +219,33 @@
 
     <section id="run" class="run-chapter">
       <div class="run-copy">
-        <h2>Run light.<br />Containerize only when useful.</h2>
+        <h2>Start local.<br />Host only when deliberate.</h2>
         <p>
-          Native mode is the everyday personal setup. Docker remains a second,
-          reproducible path for isolation and optional sidecars. v0.5 also adds
-          encrypted local credentials, per-project router keys, and live usage events.
+          Native mode remains the everyday personal setup. Docker adds isolation.
+          v0.7 adds a PostgreSQL state backend for authenticated serverless hosting,
+          but hosted inference stays fail-closed until durable state, encryption,
+          admin auth, and project-key enforcement are all configured.
         </p>
 
         <div class="run-tabs">
           <button type="button" class="run-tab active" data-run-tab="native">Native</button>
           <button type="button" class="run-tab" data-run-tab="docker">Docker</button>
+          <button type="button" class="run-tab" data-run-tab="hosted">Hosted</button>
         </div>
 
         <div class="run-content active" data-run-content="native">
-          <div><span>Windows</span><code>start.bat</code><button type="button" data-copy="start.bat">copy</button></div>
-          <div><span>macOS / Linux</span><code>./start.sh</code><button type="button" data-copy="./start.sh">copy</button></div>
+          <div><span>Windows</span><code>irm https://raw.githubusercontent.com/m-techy/the-router-project/main/install.ps1 | iex</code><button type="button" data-copy="irm https://raw.githubusercontent.com/m-techy/the-router-project/main/install.ps1 | iex">copy</button></div>
+          <div><span>macOS / Linux</span><code>curl -fsSL https://raw.githubusercontent.com/m-techy/the-router-project/main/install.sh | bash</code><button type="button" data-copy="curl -fsSL https://raw.githubusercontent.com/m-techy/the-router-project/main/install.sh | bash">copy</button></div>
         </div>
 
         <div class="run-content" data-run-content="docker">
           <div><span>Docker</span><code>docker compose up -d --build</code><button type="button" data-copy="docker compose up -d --build">copy</button></div>
+        </div>
+
+        <div class="run-content" data-run-content="hosted">
+          <div><span>State</span><code>ROUTER_STATE_BACKEND=postgres</code><button type="button" data-copy="ROUTER_STATE_BACKEND=postgres">copy</button></div>
+          <div><span>Readiness</span><code>GET /api/hosted/readiness</code><button type="button" data-copy="GET /api/hosted/readiness">copy</button></div>
+          <div><span>Policy</span><code>Postgres + vault + admin + project key → hosted API</code></div>
         </div>
       </div>
 
@@ -270,7 +278,7 @@ response = client.chat.completions.create(
         <span class="brand-orbit"><i></i></span>
         <span><strong>The Router</strong><small>personal-first AI routing</small></span>
       </a>
-      <span>Open source · local first · zero-cost first</span>
+      <span>Open source · local first · hosted by opt-in · zero-cost first</span>
       <a href="https://github.com/m-techy/the-router-project" target="_blank" rel="noreferrer">GitHub ↗</a>
     </footer>
   </main>
