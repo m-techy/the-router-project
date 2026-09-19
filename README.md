@@ -198,17 +198,30 @@ sha256sum -c providers.sha256
 
 See `docs/REGISTRY_RELEASES.md` for the release/verification model.
 
+## v0.7 hosted-state foundation
+
+Local SQLite remains the default. For a durable serverless deployment, set:
+
+```text
+ROUTER_STATE_BACKEND=postgres
+DATABASE_URL=<pooled postgres url>
+```
+
+The PostgreSQL backend persists the same usage, quota, health, settings, encrypted credentials, project keys, and project usage state as the local SQLite store.
+
+On Vercel, hosted inference remains fail-closed until **all** security gates are satisfied: serverless-safe Postgres, `ROUTER_VAULT_KEY`, `ROUTER_ADMIN_KEY`, `ROUTER_REQUIRE_PROJECT_KEYS=true`, at least one issued router project key, and `ROUTER_ENABLE_HOSTED_API=true`.
+
+Use `GET /api/hosted/readiness` to see each gate without exposing secret values.
+
 ## Vercel
 
-This repository can also be connected to Vercel. On Vercel, The Router intentionally serves a **public project/docs site** by default.
+This repository can be connected to Vercel. The root page intentionally remains the **public project/docs site** by default.
 
-FastAPI and streaming can run on Vercel, but the current full router uses a local SQLite usage/quota ledger and local credential store. Those are not a durable state layer for serverless Functions, so the hosted routing API is disabled by default.
-
-A future hosted mode should use a durable remote backend such as Postgres/Redis before enabling `ROUTER_ENABLE_HOSTED_API=true`.
+You can keep it docs-only forever, or deliberately enable the authenticated Postgres-backed router described above. Browser/admin writes on Vercel are also fail-closed unless durable state, vault encryption, and an admin key are configured.
 
 The repository's `vercel.json` disables Vercel deployments for the `dev` branch, so development commits do not create preview builds. Production continues to deploy from `main`.
 
-See `docs/DEPLOYMENT.md` for the deployment split.
+See `docs/DEPLOYMENT.md` for the safe activation sequence.
 
 ## Provider coverage
 
@@ -341,6 +354,7 @@ uvicorn app.main:app --reload --port 4010
 | `GET /v1/quota` | Current local + provider-reported quota state |
 | `GET /api/setup/status` | Plug-and-play readiness / missing provider keys |
 | `GET /api/adapters` | Adapter SDK version and registered modality capabilities |
+| `GET /api/hosted/readiness` | Hosted state/auth/encryption readiness gates |
 | `GET /api/vault/status` | Local credential-vault status without exposing secrets |
 | `GET/POST /api/projects` | List or create hashed local router project keys |
 | `DELETE /api/projects/{id}` | Revoke a local project key |
