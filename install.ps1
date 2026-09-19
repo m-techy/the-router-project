@@ -14,17 +14,14 @@ function Require-Command([string]$Name) {
 
 Require-Command "git"
 
-$Python = $null
+$versionScript = "import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)"
 if (Get-Command py -ErrorAction SilentlyContinue) {
-  $Python = @("py", "-3")
+  & py -3 -c $versionScript
 } elseif (Get-Command python -ErrorAction SilentlyContinue) {
-  $Python = @("python")
+  & python -c $versionScript
 } else {
   throw "The Router needs Python 3.11 or newer."
 }
-
-$versionScript = "import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)"
-& $Python[0] @($Python[1..($Python.Length - 1)] | Where-Object { $_ }) -c $versionScript
 if ($LASTEXITCODE -ne 0) {
   throw "The Router needs Python 3.11 or newer."
 }
