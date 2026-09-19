@@ -16,19 +16,22 @@ Build a plug-and-play AI router that lets personal/hobby projects consume legiti
 6. **License boundaries matter.** Bifrost Apache-2.0 and MIT code can be reused with attribution. New-API AGPL code is reference-only unless the whole licensing strategy is intentionally revisited. Do not copy unknown-license code.
 7. **No unverified free claims.** Community catalogs can discover candidates, but recurring-free status must have official/live evidence before enabling a provider in the persistent pool.
 8. **Secrets never enter git.** Keys are environment variables or future encrypted secret-store entries. Logs/dashboard must never display raw provider credentials.
+9. **Discovery never auto-promotes.** Catalog sync/reconciliation may create reports and candidates, but only a reviewed registry edit can make a model routable.
 
 ## Architecture
 
-- `app/main.py` — FastAPI facade + dashboard APIs
+- `app/main.py` — FastAPI facade, setup APIs, dashboard APIs, OpenAI endpoint
 - `app/router.py` — candidate filtering, scoring, fallback, route metadata
 - `app/quota.py` — quota estimates, provider-header reconciliation, cooldowns
-- `app/state.py` — SQLite usage ledger/runtime persistence
+- `app/state.py` — SQLite usage ledger, request traces, runtime persistence, settings
 - `app/certification.py` — active / retry_later / configured / quarantine probes
+- `app/fcm_catalog.py` — safe text parser + reconciliation for free-coding-models
 - `app/providers/` — provider transports/adapters
 - `config/providers.yaml` — reviewed active provider/model registry
 - `config/upstreams.yaml` — projects to inspect before solving known gateway/provider problems
-- `scripts/` — discovery and maintenance tools
-- `app/static/` — dashboard + playground
+- `scripts/fcm_discovery.py` — snapshots upstream reference files only
+- `scripts/reconcile_fcm.py` — review-only catalog diff; never edits the registry
+- `app/static/` — dashboard, setup flow, playground, usage/request traces
 
 ## Provider addition workflow
 
@@ -63,6 +66,13 @@ pytest -q
 uvicorn app.main:app --reload --port 4010
 ```
 
+Refresh the upstream free-model reference without executing it:
+
+```bash
+python scripts/fcm_discovery.py
+python scripts/reconcile_fcm.py
+```
+
 ## Definition of done
 
 - tests pass
@@ -70,4 +80,5 @@ uvicorn app.main:app --reload --port 4010
 - default routing remains zero-cost-only
 - provider tier/quota scope is accurate
 - dashboard/API still loads
+- discovery output cannot silently change the routing pool
 - upstream/license implications were considered
