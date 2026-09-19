@@ -15,4 +15,9 @@ jobs:
       - run: pip install -e '.[dev]'
       - name: Lint correctness
         run: ruff check --select E9,F63,F7,F82 app tests scripts
+      - name: Validate browser JavaScript
+        run: |
+          node --check app/static/app.js
+          if [ -f app/static/hosted.js ]; then node --check app/static/hosted.js; fi
+          if [ -f app/static/motion.js ]; then node --check app/static/motion.js; fi
       - run: pytest -q
