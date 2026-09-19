@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from app.models import ChatCompletionRequest, EmbeddingRequest, ProviderSpec
+from app.models import ChatCompletionRequest, EmbeddingRequest, ImageGenerationRequest, ProviderSpec
 
 
 ADAPTER_SDK_VERSION = "1.0"
@@ -19,6 +19,7 @@ class AdapterCapabilities:
     stream: bool = True
     embeddings: bool = False
     transcription: bool = False
+    image_generation: bool = False
 
 
 class ProviderError(RuntimeError):
@@ -71,6 +72,14 @@ class ProviderAdapter(ABC):
         request: EmbeddingRequest,
     ) -> tuple[dict[str, Any], httpx.Headers]:
         raise UnsupportedProviderOperation("embeddings")
+
+    async def image_generation(
+        self,
+        provider: ProviderSpec,
+        model: str,
+        request: ImageGenerationRequest,
+    ) -> tuple[dict[str, Any], httpx.Headers]:
+        raise UnsupportedProviderOperation("image_generation")
 
     async def transcription(
         self,
