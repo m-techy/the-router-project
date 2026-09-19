@@ -223,7 +223,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(
     title="The Router",
     description="Free-tier-aware multi-provider AI router",
-    version="0.5.0",
+    version="0.6.0",
     lifespan=lifespan,
 )
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -433,6 +433,11 @@ async def live_events(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache"},
     )
+
+
+@app.get("/api/adapters")
+async def adapters() -> dict[str, Any]:
+    return {"sdk_version": "1.0", "adapters": router.adapter_inventory()}
 
 
 @app.get("/v1/providers")
