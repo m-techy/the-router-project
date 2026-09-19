@@ -15,7 +15,11 @@ def test_v04_openai_compatible_modality_routes_exist():
     assert "/api/vault/status" in paths
     assert "/api/adapters" in paths
     assert "/api/hosted/readiness" in paths
+    assert "/api/doctor" in paths
+    assert "/api/routes" in paths
+    assert "/v1/images/generations" in paths
+    assert "/v1/responses" in paths
 
 
-def test_router_reports_v07_version():
-    assert app.version == "0.7.0"
+def test_router_reports_v08_version():
+    assert app.version == "0.8.0"
