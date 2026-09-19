@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Router</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">R</div><div><strong>The Router</strong><span>Free AI control plane</span></div></div>
+      <nav>
+        <button class="nav active" data-view="overview">Overview</button>
+        <button class="nav" data-view="providers">Providers</button>
+        <button class="nav" data-view="playground">Playground</button>
+        <button class="nav" data-view="usage">Usage</button>
+      </nav>
+      <div class="sidebar-foot"><span class="dot" id="healthDot"></span><span id="healthLabel">Checking router…</span></div>
+    </aside>
+    <main>
+      <header><div><h1 id="viewTitle">Overview</h1><p id="viewSubtitle">Persistent free capacity, one API.</p></div><button id="refreshBtn" class="ghost">Refresh</button></header>
+      <section id="overview" class="view active">
+        <div class="hero">
+          <div><span class="eyebrow">ZERO-COST FIRST</span><h2>Route hobby projects across every legitimate free AI pool.</h2><p>One OpenAI-compatible endpoint. Quota-aware routing, fallbacks, provider health, and a living catalog.</p></div>
+          <div class="endpoint"><span>BASE URL</span><code id="baseUrl"></code><button id="copyBase">Copy</button></div>
+        </div>
+        <div class="stats" id="stats"></div>
+        <div class="grid two">
+          <article class="panel"><div class="panel-head"><h3>Free capacity</h3><span>configured providers</span></div><div id="capacityList" class="capacity-list"></div></article>
+          <article class="panel"><div class="panel-head"><h3>Recent routes</h3><span>latest requests</span></div><div id="recentMini" class="table-wrap"></div></article>
+        </div>
+      </section>
+      <section id="providers" class="view">
+        <div class="toolbar"><input id="providerSearch" placeholder="Search providers or models"/><select id="tierFilter"><option value="all">All tiers</option><option value="persistent_free">Persistent free</option><option value="promotional">Promotional</option><option value="trial">Trial</option></select></div>
+        <div id="providerGrid" class="provider-grid"></div>
+      </section>
+      <section id="playground" class="view">
+        <div class="playground-layout">
+          <article class="panel compose">
+            <div class="panel-head"><h3>Prompt</h3><span>OpenAI-compatible test console</span></div>
+            <label>Virtual model<select id="playModel"><option>free/auto</option><option>free/fast</option><option>free/smart</option><option>free/code</option><option>free/reasoning</option><option>free/vision</option><option>free/long</option><option>promo/auto</option><option>trial/auto</option></select></label>
+            <label>System message<textarea id="systemPrompt" rows="3" placeholder="Optional system instruction"></textarea></label>
+            <label>User message<textarea id="userPrompt" rows="10" placeholder="Ask anything…">Write a short Python function that deduplicates a list while preserving order.</textarea></label>
+            <div class="actions"><button id="previewRoute" class="ghost">Preview route</button><button id="sendPrompt" class="primary">Run</button></div>
+            <div id="routePreview" class="route-preview"></div>
+          </article>
+          <article class="panel output-panel">
+            <div class="panel-head"><h3>Response</h3><span id="routeMeta">No request yet</span></div>
+            <pre id="playOutput">Ready.</pre>
+          </article>
+        </div>
+      </section>
+      <section id="usage" class="view">
+        <div class="stats" id="usageStats"></div>
+        <article class="panel"><div class="panel-head"><h3>Usage ledger</h3><span>persisted in SQLite</span></div><div id="usageTable" class="table-wrap"></div></article>
+      </section>
+    </main>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
