@@ -20,4 +20,8 @@ jobs:
           node --check app/static/app.js
           if [ -f app/static/hosted.js ]; then node --check app/static/hosted.js; fi
           if [ -f app/static/motion.js ]; then node --check app/static/motion.js; fi
+      - name: Validate local launch scripts
+        run: |
+          bash -n start.sh
+          bash -n start-docker.sh
       - run: pytest -q
