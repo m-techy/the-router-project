@@ -119,6 +119,24 @@ def response_request_to_chat(request: ResponseCreateRequest) -> ChatCompletionRe
                         content=_response_content_to_chat(item.get("content", "")),
                     )
                 )
+            elif kind == "function_call":
+                call_id = str(item.get("call_id") or item.get("id") or "")
+                messages.append(
+                    ChatMessage(
+                        role="assistant",
+                        content="",
+                        tool_calls=[
+                            {
+                                "id": call_id,
+                                "type": "function",
+                                "function": {
+                                    "name": item.get("name"),
+                                    "arguments": item.get("arguments") or "{}",
+                                },
+                            }
+                        ],
+                    )
+                )
             elif kind == "function_call_output":
                 messages.append(
                     ChatMessage(
