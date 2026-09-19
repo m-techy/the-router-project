@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 
 from .models import Candidate, CertificationState, ChatCompletionRequest, ProviderSpec, TierType
-from .providers import BifrostAdapter, OpenAICompatibleAdapter
+from .providers import BifrostAdapter, GeminiHybridAdapter, OpenAICompatibleAdapter
 from .providers.base import ProviderError
 from .quota import QuotaManager
 from .registry import ProviderRegistry, model_is_current
@@ -84,6 +84,7 @@ class FreeRouter:
         self.client = httpx.AsyncClient(timeout=timeout)
         self.adapters = {
             "openai_compatible": OpenAICompatibleAdapter(self.client, self.quota.store.get_secret),
+            "gemini_hybrid": GeminiHybridAdapter(self.client, self.quota.store.get_secret),
             "bifrost": BifrostAdapter(self.client),
         }
         self.transport_mode = os.getenv("ROUTER_TRANSPORT", "direct").lower()
