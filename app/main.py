@@ -8,6 +8,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel, Field
+
 import httpx
 from fastapi import FastAPI, File, Form, Header, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
@@ -16,6 +18,13 @@ from fastapi.staticfiles import StaticFiles
 from .certification import certify_provider
 from .modalities import EMBEDDING_MODELS, TRANSCRIPTION_MODELS, ModalityRouter
 from .models import ChatCompletionRequest, EmbeddingRequest
+from .project_keys import (
+    ProjectCreate,
+    authenticate_project,
+    bearer_token,
+    create_project_key,
+    project_limit_state,
+)
 from .quota import QuotaManager
 from .quota_telemetry import QuotaTelemetry
 from .registry import ProviderRegistry, model_is_current
@@ -66,6 +75,48 @@ def require_admin(authorization: str | None) -> None:
         raise HTTPException(status_code=401, detail="Admin authorization required")
 
 
+class ConfigImport(BaseModel):
+    version: int = 1
+    settings: dict[str, Any] = Field(default_factory=dict)
+
+
+def project_access(authorization: str | None) -> dict[str, Any] | None:
+    project = authenticate_project(store, authorization)
+    token = bearer_token(authorization)
+    required = env_bool("ROUTER_REQUIRE_PROJECT_KEYS")
+
+    if project is None:
+        if required or (token and token.startswith("rtr_")):
+            raise HTTPException(status_code=401, detail="Valid router project key required")
+        return None
+
+    limits = project_limit_state(store, project)
+    if limits["request_limit_exhausted"]:
+        raise HTTPException(status_code=429, detail="Project daily request limit reached")
+    if limits["token_limit_exhausted"]:
+        raise HTTPException(status_code=429, detail="Project daily token limit reached")
+    return project
+
+
+def begin_project_request(project: dict[str, Any] | None) -> None:
+    if project:
+        store.record_project_usage(str(project["id"]), requests=1, tokens=0)
+
+
+def record_project_tokens(project: dict[str, Any] | None, body: dict[str, Any]) -> None:
+    if not project:
+        return
+    usage = body.get("usage") or {}
+    total = int(
+        usage.get("total_tokens")
+        or usage.get("input_tokens")
+        or usage.get("prompt_tokens")
+        or 0
+    )
+    if total > 0:
+        store.record_project_usage(str(project["id"]), requests=0, tokens=total)
+
+
 def public_base_url(request: Request) -> str:
     override = os.getenv("ROUTER_PUBLIC_URL", "").strip().rstrip("/")
     return override or str(request.base_url).rstrip("/")
@@ -107,6 +158,11 @@ def setup_status() -> dict[str, Any]:
         "writable_setup": not IS_VERCEL,
         "hosted_api_enabled": env_bool("ROUTER_ENABLE_HOSTED_API"),
         "provider_setup": provider_setup_status(registry, store),
+        "vault": store.vault_status(),
+        "projects": {
+            "count": len(store.list_projects()),
+            "enforced": env_bool("ROUTER_REQUIRE_PROJECT_KEYS"),
+        },
     }
 
 
@@ -167,7 +223,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(
     title="The Router",
     description="Free-tier-aware multi-provider AI router",
-    version="0.4.0",
+    version="0.5.0",
     lifespan=lifespan,
 )
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -246,6 +302,130 @@ async def delete_setup_value(
         raise HTTPException(status_code=400, detail="Unknown setup key")
     store.delete_secret(key)
     return {"ok": True, "key": key}
+
+
+@app.get("/api/vault/status")
+async def vault_status() -> dict[str, Any]:
+    return store.vault_status()
+
+
+@app.get("/api/projects")
+async def projects(
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    require_admin(authorization)
+    items = []
+    for project in store.list_projects():
+        item = dict(project)
+        item["usage_today"] = store.project_usage_today(str(project["id"]))
+        items.append(item)
+    return {
+        "projects": items,
+        "enforced": env_bool("ROUTER_REQUIRE_PROJECT_KEYS"),
+    }
+
+
+@app.post("/api/projects")
+async def create_project(
+    item: ProjectCreate,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    require_admin(authorization)
+    if IS_VERCEL:
+        raise HTTPException(
+            status_code=409,
+            detail="Project key creation is local/self-hosted only.",
+        )
+    created = create_project_key(store, item)
+    return {
+        **created,
+        "warning": "The project key is returned once. Store it securely.",
+    }
+
+
+@app.delete("/api/projects/{project_id}")
+async def delete_project(
+    project_id: str,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    require_admin(authorization)
+    if not store.delete_project(project_id):
+        raise HTTPException(status_code=404, detail="Unknown project")
+    return {"ok": True, "id": project_id}
+
+
+@app.get("/api/config/export")
+async def export_config(
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    require_admin(authorization)
+    return {
+        "version": 1,
+        "settings": store.all_settings(),
+        "configured_secret_keys": store.secret_keys(),
+        "secrets_included": False,
+        "vault": store.vault_status(),
+    }
+
+
+@app.post("/api/config/import")
+async def import_config(
+    item: ConfigImport,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    require_admin(authorization)
+    if IS_VERCEL:
+        raise HTTPException(
+            status_code=409,
+            detail="Config import is local/self-hosted only.",
+        )
+    if item.version != 1:
+        raise HTTPException(status_code=400, detail="Unsupported config export version")
+    if len(item.settings) > 500:
+        raise HTTPException(status_code=400, detail="Too many settings")
+    for key, value in item.settings.items():
+        store.set_setting(str(key), value)
+    return {
+        "ok": True,
+        "settings_imported": len(item.settings),
+        "secrets_imported": 0,
+    }
+
+
+@app.get("/api/events")
+async def live_events(
+    request: Request,
+    after_id: int = 0,
+):
+    if IS_VERCEL:
+        raise HTTPException(
+            status_code=409,
+            detail="Live local event streaming is disabled on Vercel.",
+        )
+
+    async def event_stream():
+        cursor = max(0, after_id)
+        idle_ticks = 0
+        while not await request.is_disconnected():
+            rows = store.usage_after_id(cursor, limit=100)
+            if rows:
+                idle_ticks = 0
+                for row in rows:
+                    cursor = max(cursor, int(row["id"]))
+                    payload = json.dumps(row, separators=(",", ":"), default=str)
+                    yield f"id: {cursor}\nevent: usage\ndata: {payload}\n\n"
+            else:
+                idle_ticks += 1
+                if idle_ticks >= 15:
+                    idle_ticks = 0
+                    yield ": heartbeat\n\n"
+                await asyncio.sleep(1)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache"},
+    )
 
 
 @app.get("/v1/providers")
@@ -457,6 +637,7 @@ async def env_requirements() -> dict[str, Any]:
 async def embeddings(
     request: EmbeddingRequest,
     response: Response,
+    authorization: str | None = Header(default=None),
 ):
     if IS_VERCEL and not env_bool("ROUTER_ENABLE_HOSTED_API"):
         raise HTTPException(
@@ -467,6 +648,8 @@ async def embeddings(
             ),
         )
 
+    project = project_access(authorization)
+    begin_project_request(project)
     allow_trial, allow_promo = route_flags(request.model)
     try:
         routed = await modalities.embeddings(
@@ -481,6 +664,7 @@ async def embeddings(
     response.headers["x-router-model"] = routed.model
     response.headers["x-router-fallback-count"] = str(routed.fallback_count)
     response.headers["x-router-reason"] = routed.route_reason
+    record_project_tokens(project, routed.body)
     return routed.body
 
 
@@ -492,6 +676,7 @@ async def audio_transcriptions(
     prompt: str | None = Form(default=None),
     response_format: str = Form(default="json"),
     temperature: float | None = Form(default=None),
+    authorization: str | None = Header(default=None),
 ):
     if IS_VERCEL and not env_bool("ROUTER_ENABLE_HOSTED_API"):
         raise HTTPException(
@@ -506,6 +691,8 @@ async def audio_transcriptions(
     if not content:
         raise HTTPException(status_code=400, detail="Audio file is empty")
 
+    project = project_access(authorization)
+    begin_project_request(project)
     allow_trial, allow_promo = route_flags(model)
     try:
         routed = await modalities.transcription(
@@ -539,6 +726,7 @@ async def audio_transcriptions(
 async def chat_completions(
     request: ChatCompletionRequest,
     response: Response,
+    authorization: str | None = Header(default=None),
 ):
     if IS_VERCEL and not env_bool("ROUTER_ENABLE_HOSTED_API"):
         raise HTTPException(
@@ -549,6 +737,8 @@ async def chat_completions(
                 "provider credentials and a durable remote state backend."
             ),
         )
+    project = project_access(authorization)
+    begin_project_request(project)
     allow_trial, allow_promo = route_flags(request.model)
 
     if request.stream:
@@ -585,4 +775,5 @@ async def chat_completions(
     response.headers["x-router-model"] = routed.model
     response.headers["x-router-fallback-count"] = str(routed.fallback_count)
     response.headers["x-router-reason"] = routed.route_reason
+    record_project_tokens(project, routed.body)
     return routed.body
