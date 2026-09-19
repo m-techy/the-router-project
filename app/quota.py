@@ -128,6 +128,96 @@ class QuotaManager:
 
         return min(ratios) if ratios else 0.65
 
+    def model_available(self, provider_id: str, model_id: str) -> bool:
+        runtime = self.store.get_model_runtime(provider_id, model_id)
+        if not runtime:
+            return True
+        return time.time() >= float(runtime.get("blocked_until") or 0)
+
+    def model_health(self, provider_id: str, model_id: str) -> float:
+        runtime = self.store.get_model_runtime(provider_id, model_id)
+        if not runtime:
+            return 0.95
+        if time.time() < float(runtime.get("blocked_until") or 0):
+            return 0.0
+        successes = int(runtime.get("successes") or 0)
+        failures = int(runtime.get("failures") or 0)
+        total = successes + failures
+        reliability = successes / total if total else 0.95
+        latency = runtime.get("latency_ema_ms")
+        latency_factor = 1.0
+        if latency is not None:
+            latency_factor = max(0.4, min(1.0, 2200 / max(220, float(latency))))
+        return reliability * latency_factor
+
+    def _record_model_success(
+        self,
+        provider_id: str,
+        model_id: str,
+        latency_ms: float | None,
+    ) -> None:
+        runtime = self.store.get_model_runtime(provider_id, model_id) or {}
+        successes = int(runtime.get("successes") or 0) + 1
+        failures = max(0, int(runtime.get("failures") or 0) - 1)
+        previous_latency = runtime.get("latency_ema_ms")
+        latency = previous_latency
+        if latency_ms is not None:
+            latency = (
+                latency_ms
+                if previous_latency is None
+                else 0.8 * float(previous_latency) + 0.2 * latency_ms
+            )
+        self.store.upsert_model_runtime(
+            provider_id,
+            model_id,
+            successes=successes,
+            failures=failures,
+            latency_ema_ms=latency,
+            blocked_until=0,
+        )
+
+    def _record_model_failure(
+        self,
+        provider_id: str,
+        model_id: str,
+        status_code: int | None,
+        latency_ms: float | None,
+    ) -> None:
+        runtime = self.store.get_model_runtime(provider_id, model_id) or {}
+        failures = int(runtime.get("failures") or 0) + 1
+        successes = int(runtime.get("successes") or 0)
+        blocked_until = float(runtime.get("blocked_until") or 0)
+        now = time.time()
+
+        if status_code in {404, 410}:
+            blocked_until = max(blocked_until, now + 3600)
+        elif status_code == 429:
+            blocked_until = max(blocked_until, now + 60)
+        elif status_code in {401, 403}:
+            blocked_until = max(blocked_until, now + 900)
+        elif status_code is None or (status_code and status_code >= 500):
+            blocked_until = max(
+                blocked_until,
+                now + min(300, 15 * (2 ** min(failures, 4))),
+            )
+
+        previous_latency = runtime.get("latency_ema_ms")
+        latency = previous_latency
+        if latency_ms is not None:
+            latency = (
+                latency_ms
+                if previous_latency is None
+                else 0.8 * float(previous_latency) + 0.2 * latency_ms
+            )
+        self.store.upsert_model_runtime(
+            provider_id,
+            model_id,
+            successes=successes,
+            failures=failures,
+            latency_ema_ms=latency,
+            blocked_until=blocked_until,
+        )
+
     def health(self, provider_id: str) -> float:
         state = self._ensure_loaded(provider_id)
         total = state.successes + state.failures
@@ -198,6 +288,8 @@ class QuotaManager:
         if latency_ms is not None:
             state.latency_ema_ms = latency_ms if state.latency_ema_ms is None else 0.8 * state.latency_ema_ms + 0.2 * latency_ms
 
+        self._record_model_success(provider_id, model_id, latency_ms)
+
         self.store.record_usage(
             ts=now,
             request_id=request_id,
@@ -240,6 +332,8 @@ class QuotaManager:
             state.blocked_until = max(state.blocked_until, now + 900)
         elif status_code is None or status_code >= 500:
             state.blocked_until = max(state.blocked_until, now + min(300, 15 * (2 ** min(state.failures, 4))))
+
+        self._record_model_failure(provider_id, model_id, status_code, latency_ms)
 
         self.store.record_usage(
             ts=now,
