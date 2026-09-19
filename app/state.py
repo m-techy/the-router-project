@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS usage_events (
  latency_ms REAL, fallback_count INTEGER NOT NULL DEFAULT 0, error TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_usage_provider_ts ON usage_events(provider_id, ts);
+CREATE INDEX IF NOT EXISTS idx_usage_request_id ON usage_events(request_id);
 CREATE INDEX IF NOT EXISTS idx_usage_ts ON usage_events(ts);
 
 CREATE TABLE IF NOT EXISTS provider_runtime (
@@ -46,11 +47,11 @@ class StateStore:
         with self._conn:
             self._conn.executescript(SCHEMA)
 
-    def close(self):
+    def close(self) -> None:
         with self._lock:
             self._conn.close()
 
-    def record_usage(self, **event: Any):
+    def record_usage(self, **event: Any) -> None:
         cols = [
             "ts",
             "request_id",
@@ -73,7 +74,7 @@ class StateStore:
                 vals,
             )
 
-    def recent_usage(self, limit: int = 100):
+    def recent_usage(self, limit: int = 100) -> list[dict[str, Any]]:
         with self._lock:
             rows = self._conn.execute(
                 "SELECT * FROM usage_events ORDER BY id DESC LIMIT ?",
@@ -81,7 +82,7 @@ class StateStore:
             ).fetchall()
         return [dict(r) for r in rows]
 
-    def usage_since(self, provider_id: str, since: float):
+    def usage_since(self, provider_id: str, since: float) -> list[dict[str, Any]]:
         with self._lock:
             rows = self._conn.execute(
                 "SELECT * FROM usage_events WHERE provider_id=? AND ts>=? ORDER BY ts",
@@ -89,7 +90,7 @@ class StateStore:
             ).fetchall()
         return [dict(r) for r in rows]
 
-    def request_trace(self, request_id: str):
+    def request_trace(self, request_id: str) -> list[dict[str, Any]]:
         with self._lock:
             rows = self._conn.execute(
                 "SELECT * FROM usage_events WHERE request_id=? ORDER BY id",
@@ -97,7 +98,7 @@ class StateStore:
             ).fetchall()
         return [dict(r) for r in rows]
 
-    def usage_summary(self, since: float):
+    def usage_summary(self, since: float) -> dict[str, Any]:
         with self._lock:
             totals = self._conn.execute(
                 """
@@ -124,7 +125,7 @@ class StateStore:
             ).fetchall()
         return {"totals": dict(totals), "by_provider": [dict(r) for r in rows]}
 
-    def get_runtime(self, provider_id: str):
+    def get_runtime(self, provider_id: str) -> dict[str, Any] | None:
         with self._lock:
             row = self._conn.execute(
                 "SELECT * FROM provider_runtime WHERE provider_id=?",
@@ -132,7 +133,7 @@ class StateStore:
             ).fetchone()
         return dict(row) if row else None
 
-    def upsert_runtime(self, provider_id: str, **values: Any):
+    def upsert_runtime(self, provider_id: str, **values: Any) -> None:
         old = self.get_runtime(provider_id) or {}
         data = {
             "blocked_until": old.get("blocked_until", 0),
@@ -175,22 +176,29 @@ class StateStore:
                 params,
             )
 
-    def all_runtime(self):
+    def all_runtime(self) -> list[dict[str, Any]]:
         with self._lock:
             rows = self._conn.execute(
                 "SELECT * FROM provider_runtime ORDER BY provider_id"
             ).fetchall()
         return [dict(r) for r in rows]
 
-    def get_setting(self, key: str) -> str | None:
+    def get_setting(self, key: str, default: Any = None) -> Any:
         with self._lock:
             row = self._conn.execute(
                 "SELECT value FROM settings WHERE key=?",
                 (key,),
             ).fetchone()
-        return str(row["value"]) if row else None
+        if not row:
+            return default
+        raw = row["value"]
+        try:
+            return json.loads(raw)
+        except (TypeError, json.JSONDecodeError):
+            return raw
 
-    def set_setting(self, key: str, value: str) -> None:
+    def set_setting(self, key: str, value: Any) -> None:
+        encoded = json.dumps(value)
         with self._lock, self._conn:
             self._conn.execute(
                 """
@@ -199,7 +207,7 @@ class StateStore:
                   value=excluded.value,
                   updated_at=excluded.updated_at
                 """,
-                (key, value, time.time()),
+                (key, encoded, time.time()),
             )
 
     def delete_setting(self, key: str) -> None:
