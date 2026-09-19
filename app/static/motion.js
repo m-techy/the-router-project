@@ -5,211 +5,219 @@
     if (!window.gsap) return;
 
     const gsap = window.gsap;
-    if (window.ScrollTrigger) {
-      gsap.registerPlugin(window.ScrollTrigger);
+    const ScrollTrigger = window.ScrollTrigger;
+    if (ScrollTrigger) gsap.registerPlugin(ScrollTrigger);
+
+    const brand = document.querySelector(".brand-lockup");
+    if (brand) {
+      gsap.from(brand, {
+        opacity: 0,
+        y: -10,
+        duration: 0.65,
+        ease: "power3.out",
+      });
     }
 
-    gsap.from(".brand", {
-      opacity: 0,
-      y: -10,
-      duration: 0.65,
-      ease: "power3.out",
-    });
+    const navItems = document.querySelectorAll(".nav");
+    if (navItems.length) {
+      gsap.from(navItems, {
+        opacity: 0,
+        y: -8,
+        duration: 0.45,
+        stagger: 0.025,
+        ease: "power2.out",
+      });
+    }
 
-    gsap.from(".nav", {
-      opacity: 0,
-      x: -10,
-      duration: 0.45,
-      stagger: 0.035,
-      ease: "power2.out",
-    });
+    const signalCore = document.querySelector(".signal-core");
+    if (signalCore) {
+      gsap.to(signalCore, {
+        scale: 1.035,
+        duration: 1.9,
+        yoyo: true,
+        repeat: -1,
+        ease: "sine.inOut",
+      });
+      gsap.to(".orbit-b", {
+        rotation: 360,
+        transformOrigin: "50% 50%",
+        duration: 32,
+        repeat: -1,
+        ease: "none",
+      });
+    }
 
-    const pulse = gsap.to(".route-core", {
-      scale: 1.035,
-      duration: 1.9,
-      yoyo: true,
-      repeat: -1,
-      ease: "sine.inOut",
-      paused: true,
-    });
-    if (document.querySelector(".route-core")) pulse.play();
-
-    gsap.to(".route-lines path", {
-      strokeDashoffset: -40,
-      duration: 4,
-      repeat: -1,
-      ease: "none",
-    });
+    const sphereCore = document.querySelector(".sphere-core");
+    if (sphereCore) {
+      gsap.to(sphereCore, {
+        scale: 1.04,
+        duration: 2.1,
+        yoyo: true,
+        repeat: -1,
+        ease: "sine.inOut",
+      });
+      gsap.to(".ring-two", {
+        rotation: 360,
+        transformOrigin: "50% 50%",
+        duration: 38,
+        repeat: -1,
+        ease: "none",
+      });
+    }
 
     function animateView(view) {
       if (!view) return;
-      const panels = view.querySelectorAll(
-        ".reveal-panel, .panel, .stat, .provider-card, .guide-step",
+      const elements = view.querySelectorAll(
+        ".system-hero, .telemetry-cell, .matrix-panel, .setup-intro, .setup-console, " +
+          ".credential-provider, .providers-intro, .provider-row, .playground-shell, " +
+          ".usage-workspace, .catalog-surface, .guide-hero, .guide-stack article, .route-accordion",
       );
-      gsap.killTweensOf(panels);
+      if (!elements.length) return;
+
+      gsap.killTweensOf(elements);
       gsap.fromTo(
-        panels,
-        { opacity: 0, y: 16, scale: 0.985 },
+        elements,
+        { opacity: 0, y: 16 },
         {
           opacity: 1,
           y: 0,
-          scale: 1,
-          duration: 0.55,
-          stagger: 0.035,
+          duration: 0.5,
+          stagger: 0.025,
           ease: "power3.out",
           clearProps: "transform",
         },
       );
     }
 
-    animateView(document.querySelector(".view.active"));
+    const activeView = document.querySelector(".view.active");
+    if (activeView) animateView(activeView);
 
-    const workspace = document.querySelector(".workspace");
-    if (workspace) {
-      const observer = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-          if (
-            mutation.type === "attributes" &&
-            mutation.attributeName === "class" &&
-            mutation.target.classList.contains("active")
-          ) {
-            animateView(mutation.target);
-          }
+    document.querySelectorAll(".view").forEach((view) => {
+      const observer = new MutationObserver(() => {
+        if (view.classList.contains("active")) {
+          requestAnimationFrame(() => animateView(view));
         }
       });
-      document.querySelectorAll(".view").forEach((view) => {
-        observer.observe(view, { attributes: true });
-      });
-    }
+      observer.observe(view, { attributes: true, attributeFilter: ["class"] });
+    });
 
-    if (window.ScrollTrigger && window.matchMedia("(min-width: 901px)").matches) {
-      const guide = document.querySelector("#guide");
-      const guideHero = guide?.querySelector(".guide-hero");
-      const guideSteps = guide?.querySelector(".guide-steps");
-      if (guide && guideHero && guideSteps) {
-        let trigger = null;
-
-        const syncGuideTrigger = () => {
-          if (!guide.classList.contains("active")) {
-            trigger?.kill();
-            trigger = null;
-            return;
-          }
-          if (trigger) return;
-
-          requestAnimationFrame(() => {
-            trigger = window.ScrollTrigger.create({
-              trigger: guideSteps,
-              start: "top 110px",
-              end: "bottom bottom-=90",
-              pin: guideHero,
-              pinSpacing: false,
-              invalidateOnRefresh: true,
-            });
-            window.ScrollTrigger.refresh();
-          });
-        };
-
-        const guideObserver = new MutationObserver(syncGuideTrigger);
-        guideObserver.observe(guide, { attributes: true, attributeFilter: ["class"] });
-        syncGuideTrigger();
-      }
-    }
-
-    if (document.querySelector(".hosted-hero")) {
-      gsap.from(".floating-nav", {
+    const publicHero = document.querySelector(".cinematic-hero");
+    if (publicHero) {
+      gsap.from(".site-nav", {
         opacity: 0,
         y: -18,
         duration: 0.75,
         ease: "power3.out",
       });
-      gsap.from(".hosted-hero .hero-copy > *", {
+      gsap.from(".cinematic-hero .hero-copy > *", {
         opacity: 0,
-        y: 24,
-        duration: 0.8,
-        stagger: 0.08,
+        y: 26,
+        duration: 0.85,
+        stagger: 0.075,
         ease: "power3.out",
       });
-      gsap.from(".hero-visual", {
+      gsap.from(".router-sphere", {
         opacity: 0,
-        x: 30,
-        scale: 0.96,
-        duration: 1,
+        scale: 0.86,
+        duration: 1.15,
         delay: 0.12,
         ease: "power3.out",
       });
-
-      if (window.ScrollTrigger) {
-        document.querySelectorAll(".visual-frame img").forEach((image) => {
-          gsap.fromTo(
-            image,
-            { scale: 0.82, opacity: 0.45 },
-            {
-              scale: 1,
-              opacity: 1,
-              ease: "none",
-              scrollTrigger: {
-                trigger: image.closest(".visual-frame"),
-                start: "top 88%",
-                end: "center 52%",
-                scrub: true,
-              },
-            },
-          );
-          gsap.to(image, {
-            opacity: 0.22,
-            ease: "none",
-            scrollTrigger: {
-              trigger: image.closest(".visual-frame"),
-              start: "center 35%",
-              end: "bottom 8%",
-              scrub: true,
-            },
-          });
-        });
-
-        const storySection = document.querySelector(".story-section");
-        const storyPin = document.querySelector(".story-pin");
-        if (
-          storySection &&
-          storyPin &&
-          window.matchMedia("(min-width: 981px)").matches
-        ) {
-          window.ScrollTrigger.create({
-            trigger: storySection,
-            start: "top 110px",
-            end: "bottom bottom-=80",
-            pin: storyPin,
-            pinSpacing: false,
-            invalidateOnRefresh: true,
-          });
-        }
-
-        gsap.utils.toArray(".bento-card").forEach((card, index) => {
-          gsap.from(card, {
-            opacity: 0,
-            y: 26,
-            scale: 0.985,
-            duration: 0.7,
-            delay: index * 0.025,
-            ease: "power3.out",
-            scrollTrigger: {
-              trigger: card,
-              start: "top 88%",
-            },
-          });
-        });
-      }
     }
 
-    document.querySelectorAll(".interactive-card").forEach((card) => {
-      card.addEventListener("pointerenter", () => {
-        gsap.to(card, { y: -4, duration: 0.28, ease: "power2.out" });
-      });
-      card.addEventListener("pointerleave", () => {
-        gsap.to(card, { y: 0, duration: 0.28, ease: "power2.out" });
+    if (!ScrollTrigger) return;
+
+    gsap.utils.toArray(".bento").forEach((card, index) => {
+      gsap.from(card, {
+        opacity: 0,
+        y: 24,
+        duration: 0.7,
+        delay: index * 0.025,
+        ease: "power3.out",
+        scrollTrigger: {
+          trigger: card,
+          start: "top 88%",
+        },
       });
     });
+
+    const desire = document.querySelector(".desire-chapter");
+    const pinnedCopy = document.querySelector(".pinned-copy");
+    if (
+      desire &&
+      pinnedCopy &&
+      window.matchMedia("(min-width: 981px)").matches
+    ) {
+      ScrollTrigger.create({
+        trigger: desire,
+        start: "top 118px",
+        end: "bottom bottom-=90",
+        pin: pinnedCopy,
+        pinSpacing: false,
+        invalidateOnRefresh: true,
+      });
+    }
+
+    const stackCards = gsap.utils.toArray(".stack-card");
+    stackCards.forEach((card, index) => {
+      const image = card.querySelector("img");
+      if (image) {
+        gsap.fromTo(
+          image,
+          { scale: 0.9 },
+          {
+            scale: 1,
+            ease: "none",
+            scrollTrigger: {
+              trigger: card,
+              start: "top 90%",
+              end: "top 28%",
+              scrub: true,
+            },
+          },
+        );
+      }
+
+      gsap.to(card, {
+        scale: 1 - index * 0.018,
+        transformOrigin: "50% 0%",
+        ease: "none",
+        scrollTrigger: {
+          trigger: card,
+          start: "top 150px",
+          end: "bottom 120px",
+          scrub: true,
+        },
+      });
+
+      if (index < stackCards.length - 1) {
+        gsap.to(card, {
+          opacity: 0.34,
+          ease: "none",
+          scrollTrigger: {
+            trigger: stackCards[index + 1],
+            start: "top 65%",
+            end: "top 24%",
+            scrub: true,
+          },
+        });
+      }
+    });
+
+    const finalAction = document.querySelector(".final-action");
+    if (finalAction) {
+      gsap.from(finalAction.children, {
+        opacity: 0,
+        y: 30,
+        duration: 0.75,
+        stagger: 0.08,
+        ease: "power3.out",
+        scrollTrigger: {
+          trigger: finalAction,
+          start: "top 82%",
+        },
+      });
+    }
   }
 
   if (document.readyState === "loading") {
