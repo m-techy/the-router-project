@@ -79,13 +79,25 @@
     }
   }
 
+  function adminKey() {
+    return window.sessionStorage.getItem("routerAdminKey") || "";
+  }
+
+  function authHeaders(headers = {}) {
+    const key = adminKey();
+    return {
+      ...headers,
+      ...(key ? { Authorization: `Bearer ${key}` } : {}),
+    };
+  }
+
   async function api(path, options = {}) {
     const response = await fetch(path, {
       ...options,
-      headers: {
+      headers: authHeaders({
         "Content-Type": "application/json",
         ...(options.headers || {}),
-      },
+      }),
     });
 
     const text = await response.text();
@@ -613,12 +625,12 @@
   function renderRouteModels() {
     const select = $("#playModel");
     if (!select) return;
-    const existing = new Set([...select.options].map((option) => option.value));
+    select.querySelectorAll("option[data-custom-route]").forEach((option) => option.remove());
     for (const route of state.routes || []) {
-      if (existing.has(route.model)) continue;
       const option = document.createElement("option");
       option.value = route.model;
       option.textContent = route.model;
+      option.dataset.customRoute = "true";
       select.appendChild(option);
     }
   }
@@ -924,6 +936,31 @@
     $("#copyBase").addEventListener("click", () =>
       copyText(`${location.origin}/v1`, "Base URL copied"),
     );
+
+    $("#adminUnlockBtn").addEventListener("click", () => {
+      $("#adminKeyInput").value = adminKey();
+      $("#adminDialog").showModal();
+    });
+
+    $("#saveAdminKey").addEventListener("click", async () => {
+      const value = $("#adminKeyInput").value.trim();
+      if (!value) {
+        toast("Enter the admin key or clear it", "neutral");
+        return;
+      }
+      window.sessionStorage.setItem("routerAdminKey", value);
+      $("#adminDialog").close();
+      toast("Admin controls unlocked for this tab", "good");
+      await refresh();
+    });
+
+    $("#clearAdminKey").addEventListener("click", async () => {
+      window.sessionStorage.removeItem("routerAdminKey");
+      $("#adminKeyInput").value = "";
+      $("#adminDialog").close();
+      toast("Session admin key cleared", "neutral");
+      await refresh();
+    });
 
     $$(".snippet-tab").forEach((button) =>
       button.addEventListener("click", () => {
