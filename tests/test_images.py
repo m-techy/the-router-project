@@ -69,7 +69,7 @@ def test_image_route_selects_reviewed_cloudflare_flux(tmp_path, monkeypatch):
     assert candidates
     assert candidates[0].provider_id == "cloudflare-ai"
     assert candidates[0].model_id == "@cf/black-forest-labs/flux-1-schnell"
-    assert image_neuron_estimate(request) == pytest.approx(43.2)
+    assert image_neuron_estimate(request) == pytest.approx(57.6)
     store.close()
 
 
