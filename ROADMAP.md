@@ -31,11 +31,11 @@
 - [x] provider/model change review screen in the dashboard
 
 ## v0.4 — more modalities
-- [ ] /v1/embeddings
-- [ ] /v1/audio/transcriptions
-- [ ] multimodal request normalization tests
-- [ ] image-generation capability registry
-- [ ] task-aware virtual routes per modality
+- [x] /v1/embeddings
+- [x] /v1/audio/transcriptions
+- [x] multimodal request normalization tests
+- [x] image-generation capability registry
+- [x] task-aware virtual routes per modality
 
 ## v0.5 — platform UX
 - [ ] encrypted local key vault option
