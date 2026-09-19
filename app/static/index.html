@@ -9,40 +9,115 @@
 <body>
   <div class="shell">
     <aside class="sidebar">
-      <div class="brand"><div class="brand-mark">R</div><div><strong>The Router</strong><span>Free AI control plane</span></div></div>
+      <div class="brand">
+        <div class="brand-mark">R</div>
+        <div><strong>The Router</strong><span>Free AI control plane</span></div>
+      </div>
       <nav>
         <button class="nav active" data-view="overview">Overview</button>
+        <button class="nav" data-view="setup">Setup</button>
         <button class="nav" data-view="providers">Providers</button>
         <button class="nav" data-view="playground">Playground</button>
-        <button class="nav" data-view="usage">Usage</button>
+        <button class="nav" data-view="usage">Usage & traces</button>
       </nav>
-      <div class="sidebar-foot"><span class="dot" id="healthDot"></span><span id="healthLabel">Checking router…</span></div>
+      <div class="sidebar-foot">
+        <span class="dot" id="healthDot"></span>
+        <span id="healthLabel">Checking router…</span>
+      </div>
     </aside>
+
     <main>
-      <header><div><h1 id="viewTitle">Overview</h1><p id="viewSubtitle">Persistent free capacity, one API.</p></div><button id="refreshBtn" class="ghost">Refresh</button></header>
+      <header>
+        <div>
+          <h1 id="viewTitle">Overview</h1>
+          <p id="viewSubtitle">Persistent free capacity, one API.</p>
+        </div>
+        <button id="refreshBtn" class="ghost">Refresh</button>
+      </header>
+
       <section id="overview" class="view active">
         <div class="hero">
-          <div><span class="eyebrow">ZERO-COST FIRST</span><h2>Route hobby projects across every legitimate free AI pool.</h2><p>One OpenAI-compatible endpoint. Quota-aware routing, fallbacks, provider health, and a living catalog.</p></div>
-          <div class="endpoint"><span>BASE URL</span><code id="baseUrl"></code><button id="copyBase">Copy</button></div>
+          <div>
+            <span class="eyebrow">ZERO-COST FIRST</span>
+            <h2>Route hobby projects across every legitimate free AI pool.</h2>
+            <p>One OpenAI-compatible endpoint. Quota-aware routing, fallbacks, provider health, and a living catalog.</p>
+          </div>
+          <div class="endpoint">
+            <span>OPENAI BASE URL</span>
+            <code id="baseUrl"></code>
+            <button id="copyBase" class="ghost">Copy</button>
+          </div>
         </div>
         <div class="stats" id="stats"></div>
         <div class="grid two">
-          <article class="panel"><div class="panel-head"><h3>Free capacity</h3><span>configured providers</span></div><div id="capacityList" class="capacity-list"></div></article>
-          <article class="panel"><div class="panel-head"><h3>Recent routes</h3><span>latest requests</span></div><div id="recentMini" class="table-wrap"></div></article>
+          <article class="panel">
+            <div class="panel-head"><h3>Free capacity</h3><span>configured providers</span></div>
+            <div id="capacityList" class="capacity-list"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head"><h3>Recent routes</h3><span>latest requests</span></div>
+            <div id="recentMini" class="table-wrap"></div>
+          </article>
         </div>
       </section>
+
+      <section id="setup" class="view">
+        <div class="setup-grid">
+          <article class="panel">
+            <div class="panel-head"><h3>Readiness</h3><span>first-run status</span></div>
+            <div id="setupReadiness"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head"><h3>Connect your app</h3><span>copy and paste</span></div>
+            <div class="snippet-tabs">
+              <button class="snippet-tab active" data-snippet="python">Python</button>
+              <button class="snippet-tab" data-snippet="javascript">JavaScript</button>
+              <button class="snippet-tab" data-snippet="curl">cURL</button>
+            </div>
+            <pre id="snippetCode" class="code-block"></pre>
+            <button id="copySnippet" class="ghost">Copy snippet</button>
+          </article>
+        </div>
+        <article class="panel setup-providers">
+          <div class="panel-head"><h3>Increase free capacity</h3><span>keys are read from your local environment only</span></div>
+          <div id="setupMissing" class="setup-list"></div>
+        </article>
+      </section>
+
       <section id="providers" class="view">
-        <div class="toolbar"><input id="providerSearch" placeholder="Search providers or models"/><select id="tierFilter"><option value="all">All tiers</option><option value="persistent_free">Persistent free</option><option value="promotional">Promotional</option><option value="trial">Trial</option></select></div>
+        <div class="toolbar">
+          <input id="providerSearch" placeholder="Search providers or models"/>
+          <select id="tierFilter">
+            <option value="all">All tiers</option>
+            <option value="persistent_free">Persistent free</option>
+            <option value="promotional">Promotional</option>
+            <option value="trial">Trial</option>
+          </select>
+        </div>
         <div id="providerGrid" class="provider-grid"></div>
       </section>
+
       <section id="playground" class="view">
         <div class="playground-layout">
           <article class="panel compose">
             <div class="panel-head"><h3>Prompt</h3><span>OpenAI-compatible test console</span></div>
-            <label>Virtual model<select id="playModel"><option>free/auto</option><option>free/fast</option><option>free/smart</option><option>free/code</option><option>free/reasoning</option><option>free/vision</option><option>free/long</option><option>promo/auto</option><option>trial/auto</option></select></label>
+            <label>Virtual model
+              <select id="playModel">
+                <option>free/auto</option><option>free/fast</option><option>free/smart</option>
+                <option>free/code</option><option>free/reasoning</option><option>free/vision</option>
+                <option>free/long</option><option>promo/auto</option><option>trial/auto</option>
+              </select>
+            </label>
+            <div class="inline-fields">
+              <label>Temperature<input id="temperature" type="number" min="0" max="2" step="0.1" value="0.4"/></label>
+              <label>Max tokens<input id="maxTokens" type="number" min="1" step="1" value="800"/></label>
+            </div>
             <label>System message<textarea id="systemPrompt" rows="3" placeholder="Optional system instruction"></textarea></label>
             <label>User message<textarea id="userPrompt" rows="10" placeholder="Ask anything…">Write a short Python function that deduplicates a list while preserving order.</textarea></label>
-            <div class="actions"><button id="previewRoute" class="ghost">Preview route</button><button id="sendPrompt" class="primary">Run</button></div>
+            <div class="actions">
+              <button id="previewRoute" class="ghost">Preview route</button>
+              <button id="sendPrompt" class="primary">Run</button>
+            </div>
             <div id="routePreview" class="route-preview"></div>
           </article>
           <article class="panel output-panel">
@@ -51,12 +126,23 @@
           </article>
         </div>
       </section>
+
       <section id="usage" class="view">
         <div class="stats" id="usageStats"></div>
-        <article class="panel"><div class="panel-head"><h3>Usage ledger</h3><span>persisted in SQLite</span></div><div id="usageTable" class="table-wrap"></div></article>
+        <div class="usage-layout">
+          <article class="panel">
+            <div class="panel-head"><h3>Usage ledger</h3><span>click a request to inspect its fallback chain</span></div>
+            <div id="usageTable" class="table-wrap"></div>
+          </article>
+          <article class="panel trace-panel">
+            <div class="panel-head"><h3>Request trace</h3><span id="traceId">Select a request</span></div>
+            <div id="traceDetail" class="trace-empty">Each provider attempt for a request appears here.</div>
+          </article>
+        </div>
       </section>
     </main>
   </div>
+
   <script src="/static/app.js"></script>
 </body>
 </html>
