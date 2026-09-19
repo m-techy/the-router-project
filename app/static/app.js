@@ -698,7 +698,7 @@
 
       const accordion = event.target.closest(".route-accordion-item");
       if (accordion) {
-        $(".route-accordion-item").forEach((item) =>
+        document.querySelectorAll(".route-accordion-item").forEach((item) =>
           item.classList.toggle("active", item === accordion),
         );
         return;
