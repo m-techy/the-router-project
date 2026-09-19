@@ -13,3 +13,5 @@
 @media(max-width:640px){.setup-provider-head,.setup-requirement{align-items:flex-start;flex-direction:column}.setup-input{width:100%}.setup-input input{min-width:0;flex:1}}
 
 .provider-telemetry{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.provider-telemetry span{font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:4px 7px}
+
+.catalog-list{display:grid;gap:10px;margin-top:14px}.catalog-provider{border:1px solid var(--line);border-radius:10px;padding:12px;background:#0d0f16}.catalog-provider-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.catalog-provider-head span{font-size:10px;color:var(--muted)}.catalog-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.catalog-chip{font-size:10px;padding:5px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}.catalog-chip.add{border-color:#285743;color:var(--good)}.catalog-chip.remove{border-color:#6a3039;color:var(--bad)}
