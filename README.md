@@ -23,6 +23,9 @@ The Router is a personal-first AI gateway for hobby projects, prototypes, agents
 - safe `free-coding-models` catalog reconciliation without executing upstream JavaScript
 - optional Bifrost transport for mature provider normalization while keeping the default install lightweight
 - Gemini hybrid transport: OpenAI compatibility first, native Gemini REST fallback for compatibility gaps
+- optional Fernet-encrypted local credential vault
+- per-project router API keys with daily request/token limits
+- live local SSE usage stream and safe config export/import
 
 ## Run locally
 
@@ -146,6 +149,22 @@ print(transcript.text)
 The browser UI is the primary control plane, not an optional demo. It provides first-run provider setup, generated SDK snippets, an in-app usage guide, quota/health visibility, certification probes, model inventory, route previews, an interactive playground, persistent request traces, and a review queue for upstream model changes.
 
 Provider credential values are never returned to the browser after they are saved. Locally saved credentials live in the SQLite-backed router data volume and are **not encrypted at rest yet**; use environment variables for shared or remote deployments.
+
+## v0.5 local platform controls
+
+The local platform can optionally encrypt credentials at rest:
+
+```bash
+python -m app.vault generate-key
+```
+
+Set the generated value as `ROUTER_VAULT_KEY` before launch. Existing plaintext local credentials migrate to encrypted values as they are read.
+
+The **Projects** dashboard view can issue local `rtr_...` API keys with independent daily request/token limits. Only a hash is stored and the plaintext key is shown once. Legacy `api_key="local"` remains accepted unless `ROUTER_REQUIRE_PROJECT_KEYS=true`.
+
+The dashboard also consumes `GET /api/events`, a resumable local SSE stream over the persistent usage ledger.
+
+Config export/import deliberately excludes secret values. Export files contain normal router settings plus the names of configured credential keys, never the credentials themselves.
 
 ## Vercel
 
@@ -288,6 +307,12 @@ uvicorn app.main:app --reload --port 4010
 | `GET /v1/providers` | Provider state/capabilities/quota metadata |
 | `GET /v1/quota` | Current local + provider-reported quota state |
 | `GET /api/setup/status` | Plug-and-play readiness / missing provider keys |
+| `GET /api/vault/status` | Local credential-vault status without exposing secrets |
+| `GET/POST /api/projects` | List or create hashed local router project keys |
+| `DELETE /api/projects/{id}` | Revoke a local project key |
+| `GET /api/events` | Resumable local SSE usage event stream |
+| `GET /api/config/export` | Export normal router settings with secret values excluded |
+| `POST /api/config/import` | Import non-secret router settings |
 | `GET /api/setup/snippets` | Copyable Python/JS/cURL client configs |
 | `POST /api/route/preview` | Score candidates without inference |
 | `POST /api/providers/{id}/certify` | Tiny live provider probe |
