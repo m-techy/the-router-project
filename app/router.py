@@ -14,7 +14,7 @@ from .models import Candidate, CertificationState, ChatCompletionRequest, Provid
 from .providers import BifrostAdapter, OpenAICompatibleAdapter
 from .providers.base import ProviderError
 from .quota import QuotaManager
-from .registry import ProviderRegistry
+from .registry import ProviderRegistry, model_is_current
 
 VIRTUAL_MODELS = {
     "free/auto",
@@ -141,6 +141,8 @@ class FreeRouter:
 
             for model in provider.models:
                 if not model.enabled or not model.free:
+                    continue
+                if not model_is_current(model):
                     continue
                 if not self.quota.model_available(provider.id, model.id):
                     continue
