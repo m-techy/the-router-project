@@ -2,40 +2,74 @@
 
 You do **not** need Vercel to use The Router.
 
-Local/self-hosted mode is the primary runtime because it keeps provider credentials, quota state, health/cooldowns, and request traces on your machine.
+The Router has two local run methods:
 
-> "Local" means the router runs on your computer. Cloud providers still require internet access. A future local-model adapter can provide fully air-gapped inference.
+1. **Native Python — recommended for personal use.** Lowest overhead.
+2. **Docker — optional.** Better isolation and reproducibility.
 
-## Windows — easiest path
+"Local" means the router process runs on your computer. Cloud AI providers still require internet access.
 
-Prerequisite: install and start Docker Desktop.
+## Method 1 — native Python
 
-Then either double-click:
+### Windows
+
+Install Python 3.11 or newer once.
+
+Then double-click:
 
 ```text
 start.bat
 ```
 
-or open PowerShell in the repository and run:
+or run:
 
 ```powershell
 .\start.bat
 ```
 
-The script will:
+The launcher automatically:
 
-1. verify Docker is available,
-2. build the router image,
-3. start it in the background,
-4. wait for the health endpoint,
-5. open `http://localhost:4010`.
+1. finds Python 3.11+,
+2. creates `.venv` if it does not exist,
+3. fingerprints `pyproject.toml`,
+4. installs dependencies only when that fingerprint changes,
+5. creates the local `data/` directory,
+6. starts Uvicorn on `127.0.0.1:4010`,
+7. opens the dashboard after the health endpoint responds.
 
-## macOS / Linux
+Subsequent launches skip dependency installation unless the project dependencies changed.
 
-Prerequisite: Docker Desktop or Docker Engine.
+Stop the router with **Ctrl+C** in the terminal.
+
+### macOS / Linux
 
 ```bash
-sh start.sh
+./start.sh
+```
+
+If executable permission was lost after downloading an archive:
+
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+The behavior is the same as Windows: a reusable `.venv`, lightweight FastAPI process, local SQLite state, and automatic browser opening when supported.
+
+## Method 2 — Docker
+
+Use Docker when you prefer isolation, repeatable deployment, or optional sidecars.
+
+### Windows
+
+```powershell
+.\start-docker.bat
+```
+
+### macOS / Linux
+
+```bash
+./start-docker.sh
 ```
 
 Or use Docker Compose directly:
@@ -44,52 +78,55 @@ Or use Docker Compose directly:
 docker compose up -d --build
 ```
 
-Open:
+Stop Docker mode with:
+
+```bash
+docker compose down
+```
+
+The Docker volume preserves router state between container restarts.
+
+To intentionally delete Docker-persisted router state and locally stored credentials:
+
+```bash
+docker compose down -v
+```
+
+## Dashboard and API
+
+Both methods expose the same addresses:
 
 ```text
-http://localhost:4010
+Dashboard: http://localhost:4010
+OpenAI API: http://localhost:4010/v1
+Health:    http://localhost:4010/health
 ```
 
 ## First-time setup
 
-Open **Setup** in the sidebar.
+Open **Setup** in the dashboard.
 
-You can begin even before adding every provider. Some pools support no-key or optional-key access.
+Some pools are no-key or optional-key. For more capacity, add whichever recurring-free providers you have access to, such as Groq, Gemini, Cerebras, OpenRouter, Mistral, Z.AI, SiliconFlow, and NVIDIA.
 
-For higher capacity:
+Where available, Setup links directly to provider signup and documentation pages.
 
-1. add Groq,
-2. add Gemini / Google AI Studio,
-3. add Cerebras,
-4. add OpenRouter,
-5. add Mistral,
-6. add Z.AI / SiliconFlow / NVIDIA and other available pools.
-
-The Setup page links to supported provider signup/docs pages where they are known.
-
-Environment variables still take precedence over values saved from the browser.
+Environment variables take precedence over credentials saved in the local setup store.
 
 ## Test the router
 
-Open **Playground** and select:
+Open **Playground** and choose:
 
 ```text
 free/auto
 ```
 
-Ask a short question.
+Run a short prompt, then open **Usage & traces** to see which provider/model handled it and whether fallback occurred.
 
-Then open **Usage & traces** to see which provider/model actually handled it and whether any fallback occurred.
-
-## Use it from a Python project
-
-Install the OpenAI SDK in your hobby project:
+## Python project example
 
 ```bash
 pip install openai
 ```
-
-Then:
 
 ```python
 from openai import OpenAI
@@ -109,7 +146,7 @@ response = client.chat.completions.create(
 print(response.choices[0].message.content)
 ```
 
-## JavaScript / TypeScript
+## JavaScript / TypeScript example
 
 ```bash
 npm install openai
@@ -131,10 +168,10 @@ const response = await client.chat.completions.create({
 console.log(response.choices[0].message.content);
 ```
 
-## Useful routes
+## Virtual routes
 
 - `free/auto` — balanced default
-- `free/fast` — prioritize latency
+- `free/fast` — prioritize observed latency
 - `free/smart` — prioritize model quality
 - `free/code` — coding-capable models
 - `free/reasoning` — reasoning-capable models
@@ -143,49 +180,49 @@ console.log(response.choices[0].message.content);
 - `promo/auto` — explicitly allow promotional providers
 - `trial/auto` — explicitly allow trial/expiring providers
 
-The `free/*` family does not silently opt into trial/promotional pools.
+The `free/*` routes do not silently use trial/promotional pools.
 
-## Stop the router
-
-```bash
-docker compose down
-```
-
-Your SQLite state and locally saved credentials remain in the Docker volume.
-
-To remove the persisted volume as well:
-
-```bash
-docker compose down -v
-```
-
-That deletes local router state and locally stored credentials.
-
-## Update later
+## Update the local install
 
 ```bash
 git pull
-docker compose up -d --build
 ```
 
-## Troubleshooting
+Then run your normal launcher again. Native mode detects dependency changes automatically; Docker mode rebuilds with the updated source.
 
-Check container state:
+## Troubleshooting native mode
+
+Check whether another process already owns port 4010.
+
+Windows:
+
+```powershell
+netstat -ano | findstr :4010
+```
+
+macOS/Linux:
+
+```bash
+lsof -i :4010
+```
+
+You can also start manually:
+
+```bash
+.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 4010
+```
+
+On Windows:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 4010
+```
+
+## Troubleshooting Docker mode
 
 ```bash
 docker compose ps
-```
-
-Check logs:
-
-```bash
 docker compose logs -f router
 ```
 
-Check health:
-
-```text
-http://localhost:4010/health
-```
-
-If a provider is failing, use **Providers → Probe** or inspect **Usage & traces**. A failed model can cool down without disabling every other model on that provider.
+If an individual provider is failing, use **Providers → Probe** or inspect **Usage & traces**. Model-level cooldowns prevent one failing model from unnecessarily disabling every model on the same provider.
