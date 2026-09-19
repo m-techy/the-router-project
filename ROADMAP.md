@@ -51,8 +51,15 @@
 - [x] community contribution workflow for free-provider verification
 - [x] registry validation enforced in CI
 
+## v0.7 — hosted state foundation
+- [x] selectable SQLite/PostgreSQL state backend
+- [x] durable PostgreSQL usage, quota, health, settings, secrets, and project state
+- [x] encrypted provider credentials on the hosted state backend
+- [x] fail-closed hosted routing readiness checks
+- [x] real PostgreSQL integration coverage in CI
+
 ## v1.0 — hosted without sacrificing self-hosting
-- [ ] durable remote state abstraction for hosted deployments
-- [ ] encrypted hosted secret storage
-- [ ] optional hosted control plane while preserving the local-first data plane
-- [ ] hosted project/auth management without changing local defaults
+- [ ] hosted control-plane UI while preserving the public project site
+- [ ] hosted-safe live events / realtime usage updates
+- [ ] connection pooling and operational telemetry guidance for sustained hosted load
+- [ ] explicit hosted deployment smoke test against a production database integration
