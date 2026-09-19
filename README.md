@@ -2,7 +2,7 @@
 
 **One OpenAI-compatible API over the legitimate free AI capacity you already have.**
 
-The Router is a personal-first AI gateway for hobby projects, prototypes, agents, and side projects that should not need a permanent LLM bill. It combines recurring free tiers, zero-price models, provider health, quota estimates, live rate-limit headers, and automatic fallback behind a single local endpoint.
+The Router is a personal-first AI gateway for hobby projects, prototypes, agents, and side projects that should not need a permanent LLM bill. It combines recurring free tiers, zero-price models, provider health, quota estimates, live rate-limit headers, automatic fallback, a setup dashboard, and request traces behind a single local endpoint.
 
 > Default policy: **spend $0**. Trials and temporary promotions are isolated from the normal pool and require explicit opt-in.
 
@@ -12,31 +12,42 @@ The Router is a personal-first AI gateway for hobby projects, prototypes, agents
 - virtual routes: `free/auto`, `free/fast`, `free/smart`, `free/code`, `free/reasoning`, `free/vision`, `free/long`
 - automatic provider/model fallback before a response begins
 - capability-aware routing for tools, JSON, vision, coding, reasoning, and context size
-- persistent SQLite usage ledger and health state
+- persistent SQLite usage ledger, request traces, and provider health state
 - quota-aware scoring with provider rate-limit header reconciliation
 - provider certification states: `active`, `retry_later`, `configured`, `quarantine`
-- browser dashboard + playground on the same port
+- browser dashboard with first-run setup, provider inventory, playground, usage, and fallback traces
 - recurring-free, promotional, and trial pools kept separate
-- upstream watchlist so we check existing gateway fixes before writing our own
+- upstream watchlist so we inspect existing fixes before writing our own
+- safe `free-coding-models` catalog reconciliation without executing upstream JavaScript
 - optional Bifrost transport for mature provider normalization while keeping the default install lightweight
 
-## 60-second start
+## Plug-and-play start
 
 ```bash
 git clone https://github.com/m-techy/the-router-project.git
 cd the-router-project
 cp .env.example .env
-# Add whichever provider keys you already have. No-key providers also work.
+
+# Optional: add whichever provider keys you already have.
+# Kilo, LLM7, and OVH sandbox can provide no-key/optional-key capacity.
 docker compose up --build
 ```
 
-Open:
+Open `http://localhost:4010`.
 
-- Dashboard + playground: `http://localhost:4010`
-- OpenAI base URL: `http://localhost:4010/v1`
-- Health: `http://localhost:4010/health`
+The **Setup** page shows:
+- how many provider pools are ready
+- which provider keys are still missing
+- direct signup/docs links
+- copy-paste Python, JavaScript, and cURL clients
 
-Then use the normal OpenAI SDK:
+OpenAI base URL:
+
+```text
+http://localhost:4010/v1
+```
+
+Python example:
 
 ```python
 from openai import OpenAI
@@ -56,9 +67,44 @@ print(response.choices[0].message.content)
 
 Your app does not need to know whether the request actually ran on Groq, Gemini, Cerebras, Z.AI, Kilo, OVH, or another configured pool.
 
-## Dashboard
+## Dashboard and playground
 
-The built-in dashboard is part of the core product. It shows configured providers, free/trial/promo pools, quota headroom, certification state, model inventory, recent routes, a persistent usage ledger, route previews, and an interactive playground. Provider keys are never displayed in the UI.
+The built-in platform UI runs on the same port as the API.
+
+**Overview**
+- configured provider count
+- persistent-free pools
+- free model count
+- quota headroom
+- recent routes
+
+**Setup**
+- first-run readiness score
+- missing environment variables
+- provider signup/docs shortcuts
+- OpenAI SDK connection snippets
+
+**Providers**
+- persistent / promotional / trial classification
+- certification state
+- quota headroom
+- currently reviewed free models
+- one-click live probe
+
+**Playground**
+- virtual route selection
+- route preview before inference
+- model scoring reasons
+- temperature and max-token controls
+- selected provider/model and fallback count
+
+**Usage & traces**
+- SQLite-backed request ledger
+- tokens and latency
+- per-request fallback chain
+- provider errors before the final successful route
+
+Provider keys are never rendered in the dashboard.
 
 ## Provider coverage
 
@@ -72,13 +118,18 @@ OpenCode Zen and temporary developer campaigns such as Volcengine Ark / Doubao o
 
 ### Trial / expiring / not baseline
 
-Alibaba DashScope / Model Studio's current 90-day allocation and Scaleway until recurrence is verified.
+Alibaba DashScope / Model Studio's current time-limited allocation and Scaleway until recurrence is verified.
 
 The registry is deliberately conservative. A provider being listed does **not** mean every model it exposes is free; only reviewed free models belong in the routing pool.
 
 ## Routing policy
 
-A provider/model is considered only if its tier is allowed, the provider is configured or supports no-key access, the model satisfies request capabilities, quota signals indicate capacity, and it is not quarantined/cooling down.
+A provider/model is considered only if:
+1. its tier is allowed,
+2. the provider is configured or supports no-key access,
+3. the model satisfies request capabilities,
+4. quota signals indicate capacity, and
+5. it is not quarantined or cooling down.
 
 Candidates are scored using model quality, quota headroom, observed reliability, observed latency, verification confidence, certification state, and route intent.
 
@@ -93,9 +144,17 @@ x-router-reason
 
 Streaming requests may fail over **before the first byte only**. The Router does not splice partial generations from different models.
 
-## Persistent quota and health
+## Persistent quota, health, and traces
 
-Request/health state is persisted in SQLite, so restart does not erase recent daily/monthly usage history. Provider rate-limit headers such as `x-ratelimit-remaining-*` are captured when available.
+Request/health state is persisted in SQLite, so restarting the router does not erase recent daily/monthly usage history. Provider rate-limit headers such as `x-ratelimit-remaining-*` are captured when available.
+
+Every fallback attempt shares a router request ID, which lets the dashboard reconstruct:
+
+```text
+Groq → 429
+Cerebras → 5xx
+Gemini → 200
+```
 
 The Router never assumes multiple API keys multiply capacity when quotas are actually account/project/organization scoped.
 
@@ -105,7 +164,7 @@ We explicitly track:
 
 - `vava-nessa/free-coding-models` — primary free-provider/model discovery + live-health reference
 - `maximhq/bifrost` — Apache-2.0 data-plane/provider-normalization reference
-- `BerriAI/litellm` — MIT core provider/proxy compatibility reference
+- `BerriAI/litellm` — provider/proxy compatibility reference
 - `QuantumNous/new-api` — China-provider/protocol reference (AGPL, reference-only by default)
 - `songquanpeng/one-api` — MIT China-provider compatibility reference
 - `DevvGwardo/free-llm-router`
@@ -114,6 +173,22 @@ We explicitly track:
 - `DeepakSilaych/free-api-gateway`
 
 See `docs/UPSTREAMS.md` and `config/upstreams.yaml`. A scheduled GitHub Action checks for upstream changes so their fixes can be reviewed first.
+
+## Safe free-coding-models sync
+
+We use `free-coding-models` aggressively as a discovery reference, but never let it modify the active routing pool automatically.
+
+```bash
+python scripts/fcm_discovery.py
+python scripts/reconcile_fcm.py
+```
+
+The first command snapshots upstream reference files. The second parses `sources.js` as text and writes a review-only diff showing:
+- new upstream models not yet reviewed here
+- reviewed models that disappeared upstream
+- per-provider catalog counts
+
+No upstream JavaScript is executed and `providers.yaml` is never edited by the reconciliation script.
 
 ## Bifrost mode
 
@@ -131,6 +206,7 @@ Bifrost provider credentials still need to be configured separately.
 
 ```bash
 python scripts/fcm_discovery.py
+python scripts/reconcile_fcm.py
 python scripts/discover_models.py
 python scripts/check_upstreams.py
 ```
@@ -156,13 +232,16 @@ uvicorn app.main:app --reload --port 4010
 | `GET /v1/models` | Virtual routes + reviewed provider/model IDs |
 | `GET /v1/providers` | Provider state/capabilities/quota metadata |
 | `GET /v1/quota` | Current local + provider-reported quota state |
+| `GET /api/setup/status` | Plug-and-play readiness / missing provider keys |
+| `GET /api/setup/snippets` | Copyable Python/JS/cURL client configs |
 | `POST /api/route/preview` | Score candidates without inference |
 | `POST /api/providers/{id}/certify` | Tiny live provider probe |
 | `GET /api/usage/summary` | Aggregated persistent usage |
 | `GET /api/usage/recent` | Recent request ledger |
+| `GET /api/usage/trace/{request_id}` | Full fallback chain for one routed request |
 | `POST /api/admin/reload` | Reload provider registry |
 | `GET /health` | Router health |
-| `GET /` | Dashboard + playground |
+| `GET /` | Dashboard, setup, playground, usage/traces |
 
 See `ROADMAP.md` for active work.
 
