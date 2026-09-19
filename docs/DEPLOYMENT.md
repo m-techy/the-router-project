@@ -1,64 +1,178 @@
 # Deployment
 
-The Router has two deployment modes with deliberately different responsibilities.
+The Router keeps local use as the default while supporting an opt-in durable hosted data plane.
 
 ## 1. Local platform — recommended
 
-This is the full router.
+Native mode remains the lightest everyday setup:
+
+```bash
+./start.sh
+```
+
+Docker remains available when you want isolation:
 
 ```bash
 docker compose up --build
 ```
 
-Open `http://localhost:4010` and use the Setup page to add provider credentials.
-
-Local mode provides:
-
-- durable SQLite usage, quota, health and trace state through the Docker volume
-- local provider credential persistence
-- provider certification probes
-- dashboard + setup wizard + playground
-- OpenAI-compatible API on `http://localhost:4010/v1`
-- optional Bifrost profile
-
-No `.env` file is required. If an `.env` file exists, Docker Compose loads it and environment values take precedence over browser-saved credentials.
-
-## 2. Vercel site mode
-
-Vercel is currently used as the public project/documentation surface.
-
-The app detects Vercel through the platform-provided `VERCEL` environment variable and serves `app/static/hosted.html` at the root.
-
-The chat routing endpoint returns a deliberate 503 unless `ROUTER_ENABLE_HOSTED_API=true`.
-
-Why? The self-hosted runtime currently depends on:
-
-- SQLite request/quota history
-- SQLite provider health/cooldown state
-- a local provider credential store
-
-A Vercel Function filesystem is not our durable multi-request database. Running with temporary state would make quota accounting and cooldown behavior unreliable.
-
-## Future hosted router
-
-Before enabling hosted routing in production, add a durable state implementation such as:
-
-- Postgres for usage/history/configuration
-- Redis-compatible storage for short-lived rate-limit counters and cooldowns
-- an encrypted hosted secret store for provider credentials
-
-Then make the state backend selectable:
+Local mode defaults to:
 
 ```text
-ROUTER_STATE_BACKEND=sqlite   # self-hosted default
-ROUTER_STATE_BACKEND=postgres # hosted
+ROUTER_STATE_BACKEND=sqlite
 ```
 
-The router engine should not care which persistence backend is active.
+SQLite persists usage, quota, health, configuration, encrypted-or-plaintext local credentials, and project keys on your machine or Docker volume.
+
+## 2. Vercel public-site mode — default
+
+When Vercel provides the `VERCEL` environment variable, the root page remains the public project/docs site.
+
+Hosted inference is **fail-closed** by default. Merely setting `ROUTER_ENABLE_HOSTED_API=true` is not enough.
+
+Check readiness at:
+
+```text
+GET /api/hosted/readiness
+```
+
+## 3. Durable hosted router — opt-in
+
+The Router supports a PostgreSQL state backend:
+
+```text
+ROUTER_STATE_BACKEND=postgres
+DATABASE_URL=<pooled PostgreSQL connection URL>
+```
+
+`POSTGRES_URL` and `POSTGRES_URL_NON_POOLING` are also recognized when `DATABASE_URL` is absent.
+
+For Vercel/serverless use, prefer the pooled/serverless connection URL supplied by your PostgreSQL provider.
+
+The Postgres backend stores the same logical state as local SQLite:
+
+- request usage and fallback traces
+- provider/model cooldown and health state
+- provider-reported quota snapshots
+- settings
+- provider credentials
+- router project keys and per-project usage
+
+Schema creation is idempotent on startup.
+
+## Hosted security gates
+
+A Vercel deployment reports routing ready only when all of these are true:
+
+```text
+ROUTER_STATE_BACKEND=postgres
+DATABASE_URL=<durable postgres>
+ROUTER_VAULT_KEY=<encryption key>
+ROUTER_ADMIN_KEY=<admin API key>
+ROUTER_REQUIRE_PROJECT_KEYS=true
+at least one router project key exists
+ROUTER_ENABLE_HOSTED_API=true
+```
+
+Postgres alone is not enough. The Router requires encryption and project authentication before it will spend provider quota from a hosted endpoint.
+
+Generate a vault key locally:
+
+```bash
+python -m app.vault generate-key
+```
+
+Use a long random value for `ROUTER_ADMIN_KEY`.
+
+## Safe activation sequence
+
+### Step 1 — attach PostgreSQL
+
+Configure:
+
+```text
+ROUTER_STATE_BACKEND=postgres
+DATABASE_URL=...
+ROUTER_VAULT_KEY=...
+ROUTER_ADMIN_KEY=...
+ROUTER_REQUIRE_PROJECT_KEYS=true
+ROUTER_ENABLE_HOSTED_API=false
+```
+
+Deploy.
+
+### Step 2 — verify control-plane readiness
+
+```bash
+curl https://YOUR_HOST/api/hosted/readiness
+```
+
+`control_plane_ready` should be true.
+
+### Step 3 — configure provider credentials
+
+Provider keys may stay in deployment environment variables.
+
+Or store a reviewed setup key in encrypted Postgres state:
+
+```bash
+curl -X POST https://YOUR_HOST/api/setup/value \
+  -H "Authorization: Bearer $ROUTER_ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"key":"GROQ_API_KEY","value":"..."}'
+```
+
+Secret values are never returned by setup/status endpoints.
+
+### Step 4 — create a router project key
+
+```bash
+curl -X POST https://YOUR_HOST/api/projects \
+  -H "Authorization: Bearer $ROUTER_ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"my-app","daily_request_limit":500}'
+```
+
+Copy the returned `rtr_...` key immediately. Only its hash/prefix are stored.
+
+### Step 5 — enable inference
+
+Set:
+
+```text
+ROUTER_ENABLE_HOSTED_API=true
+```
+
+Redeploy and check `/api/hosted/readiness` again.
+
+Your client then uses:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://YOUR_HOST/v1",
+    api_key="rtr_...",
+)
+```
+
+## Hosted admin behavior
+
+On Vercel, admin endpoints fail closed when `ROUTER_ADMIN_KEY` is missing.
+
+Credential/config/project mutations also require the serverless-safe Postgres backend plus `ROUTER_VAULT_KEY`.
+
+The public root page does not expose the admin control plane.
+
+## Current hosted limitations
+
+The local SSE endpoint `/api/events` remains disabled on Vercel. A hosted-safe realtime/event mechanism is still a v1.0 item.
+
+Provider HTTP streaming can run through the inference API, subject to the deployment platform's function limits.
 
 ## Vercel Git behavior
 
-`vercel.json` contains:
+`vercel.json` disables deployments from `dev`:
 
 ```json
 {
@@ -70,21 +184,15 @@ The router engine should not care which persistence backend is active.
 }
 ```
 
-Development work goes to `dev`. Vercel does not build that branch. Merge to `main` only after CI passes to trigger a single production deployment.
+Development work goes to `dev`; merge to `main` only after CI passes.
 
 ## Vercel FastAPI entrypoint
 
-`pyproject.toml` explicitly declares:
+`pyproject.toml` declares:
 
 ```toml
 [tool.vercel]
 entrypoint = "app.main:app"
 ```
 
-The Vercel function is also given a 60-second maximum duration in `vercel.json`.
-
-## Hosted credentials
-
-Do **not** use the browser credential-storage endpoint on Vercel. It is intentionally disabled.
-
-If hosted API mode is implemented later, credentials must come from Vercel environment variables or a dedicated encrypted remote vault.
+The public Vercel project can therefore remain documentation-only, or become an authenticated hosted router when every readiness gate above is deliberately configured.
