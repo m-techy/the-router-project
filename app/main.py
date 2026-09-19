@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import time
 from contextlib import asynccontextmanager
@@ -308,6 +309,29 @@ async def models() -> dict[str, Any]:
                     }
                 )
     return {"object": "list", "data": data}
+
+
+@app.get("/api/catalog/reconciliation")
+async def catalog_reconciliation() -> dict[str, Any]:
+    path = Path(
+        os.getenv(
+            "ROUTER_FCM_RECONCILIATION",
+            str(ROOT / "runtime" / "fcm-reconciliation.json"),
+        )
+    )
+    if not path.exists():
+        return {
+            "available": False,
+            "message": (
+                "No local catalog reconciliation report yet. "
+                "Run scripts/fcm_discovery.py and scripts/reconcile_fcm.py."
+            ),
+        }
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=500, detail="Catalog reconciliation report is invalid") from exc
+    return {"available": True, **data}
 
 
 @app.get("/api/usage/summary")
