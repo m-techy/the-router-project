@@ -190,6 +190,21 @@ def record_project_tokens(project: dict[str, Any] | None, body: dict[str, Any]) 
         store.record_project_usage(str(project["id"]), requests=0, tokens=total)
 
 
+async def account_project_stream(iterator, project, meter):
+    try:
+        async for chunk in iterator:
+            yield chunk
+    finally:
+        if project:
+            usage = meter.usage()
+            if usage.total_tokens > 0:
+                store.record_project_usage(
+                    str(project["id"]),
+                    requests=0,
+                    tokens=usage.total_tokens,
+                )
+
+
 def public_base_url(request: Request) -> str:
     override = os.getenv("ROUTER_PUBLIC_URL", "").strip().rstrip("/")
     return override or str(request.base_url).rstrip("/")
@@ -981,7 +996,14 @@ async def responses(
 
     if request.stream:
         try:
-            iterator, provider, model, fallback_count, reason = await router.stream(
+            (
+                iterator,
+                provider,
+                model,
+                fallback_count,
+                reason,
+                meter,
+            ) = await router.stream(
                 chat_request,
                 allow_trial=allow_trial,
                 allow_promo=allow_promo,
@@ -989,13 +1011,14 @@ async def responses(
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+        responses_iterator = chat_stream_to_responses(
+            iterator,
+            request,
+            provider=provider,
+            model=model,
+        )
         return StreamingResponse(
-            chat_stream_to_responses(
-                iterator,
-                request,
-                provider=provider,
-                model=model,
-            ),
+            account_project_stream(responses_iterator, project, meter),
             media_type="text/event-stream",
             headers={
                 "x-router-provider": provider,
@@ -1142,7 +1165,14 @@ async def chat_completions(
 
     if request.stream:
         try:
-            iterator, provider, model, fallback_count, reason = await router.stream(
+            (
+                iterator,
+                provider,
+                model,
+                fallback_count,
+                reason,
+                meter,
+            ) = await router.stream(
                 request,
                 allow_trial=allow_trial,
                 allow_promo=allow_promo,
@@ -1151,7 +1181,7 @@ async def chat_completions(
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
         return StreamingResponse(
-            iterator,
+            account_project_stream(iterator, project, meter),
             media_type="text/event-stream",
             headers={
                 "x-router-provider": provider,
