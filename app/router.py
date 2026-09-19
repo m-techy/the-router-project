@@ -12,7 +12,8 @@ import httpx
 
 from .models import Candidate, CertificationState, ChatCompletionRequest, ProviderSpec, TierType
 from .providers import BifrostAdapter, GeminiHybridAdapter, OpenAICompatibleAdapter
-from .providers.base import ProviderError
+from .providers.base import ProviderAdapter, ProviderError
+from .providers.sdk import validate_adapter
 from .quota import QuotaManager
 from .registry import ProviderRegistry, model_is_current
 
@@ -91,6 +92,32 @@ class FreeRouter:
 
     async def close(self) -> None:
         await self.client.aclose()
+
+    def register_adapter(
+        self,
+        name: str,
+        adapter: ProviderAdapter,
+        *,
+        replace: bool = False,
+    ) -> None:
+        validate_adapter(name, adapter)
+        if name in self.adapters and not replace:
+            raise ValueError(f"Adapter '{name}' is already registered")
+        self.adapters[name] = adapter
+
+    def adapter_inventory(self) -> dict[str, dict[str, Any]]:
+        return {
+            name: {
+                "sdk_version": getattr(adapter, "sdk_version", None),
+                "capabilities": {
+                    "chat": adapter.supports("chat"),
+                    "stream": adapter.supports("stream"),
+                    "embeddings": adapter.supports("embeddings"),
+                    "transcription": adapter.supports("transcription"),
+                },
+            }
+            for name, adapter in sorted(self.adapters.items())
+        }
 
     def _adapter(self, provider: ProviderSpec):
         if self.transport_mode == "bifrost":
