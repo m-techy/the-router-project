@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import httpx
+import pytest
+
 from app.modalities import (
     EMBEDDING_MODELS,
     TRANSCRIPTION_MODELS,
@@ -165,3 +168,75 @@ def test_image_generation_capability_is_registered():
 
     assert any(model.id == "@cf/black-forest-labs/flux-1-schnell" for model in image_models)
     assert all(not model.capabilities.chat for model in image_models)
+
+
+@pytest.mark.asyncio
+async def test_embedding_request_returns_openai_shape_with_router_metadata(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv("GOOGLE_API_KEY", "test")
+    _, store, router = make_router(tmp_path)
+
+    async def fake_embeddings(provider, model, request):
+        return {
+            "object": "list",
+            "data": [
+                {
+                    "object": "embedding",
+                    "index": 0,
+                    "embedding": [0.1, 0.2, 0.3],
+                }
+            ],
+            "model": model,
+            "usage": {"prompt_tokens": 3, "total_tokens": 3},
+        }, httpx.Headers()
+
+    router.chat_router.adapters["gemini_hybrid"].embeddings = fake_embeddings
+
+    routed = await router.embeddings(
+        EmbeddingRequest(model="embed/auto", input="hello"),
+        allow_trial=False,
+        allow_promo=False,
+    )
+
+    assert routed.provider == "google-ai"
+    assert routed.body["object"] == "list"
+    assert routed.body["data"][0]["embedding"] == [0.1, 0.2, 0.3]
+    assert routed.body["router"]["provider"] == "google-ai"
+    store.close()
+
+
+@pytest.mark.asyncio
+async def test_transcription_request_uses_groq_whisper(tmp_path, monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY", "test")
+    _, store, router = make_router(tmp_path)
+
+    async def fake_transcription(provider, model, **kwargs):
+        assert kwargs["filename"] == "sample.wav"
+        assert kwargs["data"] == b"audio-bytes"
+        return (
+            b'{"text":"hello"}',
+            httpx.Headers({"content-type": "application/json"}),
+            "application/json",
+        )
+
+    router.chat_router.adapters["openai_compatible"].transcription = fake_transcription
+
+    routed = await router.transcription(
+        requested_model="transcribe/auto",
+        filename="sample.wav",
+        data=b"audio-bytes",
+        content_type="audio/wav",
+        language=None,
+        prompt=None,
+        response_format="json",
+        temperature=None,
+        allow_trial=False,
+        allow_promo=False,
+    )
+
+    assert routed.provider == "groq"
+    assert routed.model in {"whisper-large-v3", "whisper-large-v3-turbo"}
+    assert routed.content == b'{"text":"hello"}'
+    store.close()
