@@ -358,8 +358,12 @@
           <article><b>Run</b><h3>Native first, Docker when useful.</h3><p><code>start.bat</code> / <code>./start.sh</code> creates a reusable venv and launches the lightweight FastAPI process.</p></article>
           <article><b>Connect</b><h3>Add providers only once.</h3><p>Use Setup for local credentials or keep them in environment variables. No-key pools are immediately visible.</p></article>
           <article><b>Chat</b><h3>Ask for intent, not vendor names.</h3><p>Use <code>free/auto</code>, <code>free/fast</code>, <code>free/smart</code>, <code>free/code</code>, and other virtual chat routes.</p></article>
+          <article><b>Responses</b><h3>Use modern stateless Responses clients.</h3><p>POST to <code>/v1/responses</code> for text, message, JSON-format, and function-tool workflows. Stateful conversation/background features fail explicitly instead of being emulated.</p></article>
+          <article><b>Routes</b><h3>Give each app a stable routing policy.</h3><p>Create <code>route/my-app</code> aliases with provider allow/deny rules, minimum context, fallback depth, and explicit promo/trial opt-in.</p></article>
           <article><b>Embed</b><h3>Route text or multimodal embeddings.</h3><p>POST to <code>/v1/embeddings</code> with <code>embed/auto</code>, <code>embed/text</code>, or <code>embed/multimodal</code>. Gemini handles multimodal inputs; Cloudflare adds text embedding fallback.</p></article>
           <article><b>Transcribe</b><h3>Route speech recognition through free Whisper capacity.</h3><p>POST multipart audio to <code>/v1/audio/transcriptions</code> with <code>transcribe/auto</code>, <code>transcribe/fast</code>, or <code>transcribe/accurate</code>.</p></article>
+          <article><b>Image</b><h3>Generate through reviewed free allocation.</h3><p>POST to <code>/v1/images/generations</code> with <code>image/auto</code>, <code>image/fast</code>, or <code>image/quality</code>. The initial route uses Cloudflare FLUX and reserves neurons conservatively.</p></article>
+          <article><b>Doctor</b><h3>Check readiness without spending inference.</h3><p>The Doctor view checks provider redundancy, storage safety, registry freshness, default-route candidates, project isolation, and custom-route state.</p></article>
           <article><b>Observe</b><h3>See every fallback.</h3><p>Usage traces show failed providers, winning models, latency, tokens, and cooldown behavior across modalities.</p></article>
         </div>
 
@@ -370,6 +374,8 @@
           <button type="button" class="route-accordion-item"><span>embed/multimodal</span><strong>Multimodal</strong><small>text + image + audio</small></button>
           <button type="button" class="route-accordion-item"><span>transcribe/fast</span><strong>Speech</strong><small>Whisper speed route</small></button>
           <button type="button" class="route-accordion-item"><span>transcribe/accurate</span><strong>Accurate ASR</strong><small>quality weighted</small></button>
+          <button type="button" class="route-accordion-item"><span>image/auto</span><strong>Images</strong><small>free-allocation aware</small></button>
+          <button type="button" class="route-accordion-item"><span>route/my-app</span><strong>Custom policy</strong><small>stable app alias</small></button>
         </div>
       </section>
     </main>
