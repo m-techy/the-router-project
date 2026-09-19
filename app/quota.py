@@ -364,6 +364,9 @@ class QuotaManager:
         model_id: str = "unknown",
         request_id: str | None = None,
         status_code: int | None,
+        prompt_tokens: int = 0,
+        completion_tokens: int = 0,
+        total_tokens: int = 0,
         latency_ms: float | None = None,
         fallback_count: int = 0,
         error: str | None = None,
@@ -371,6 +374,11 @@ class QuotaManager:
         state = self._ensure_loaded(provider_id)
         state.failures += 1
         now = time.time()
+        state.minute_requests.append(now)
+        state.day_requests.append(now)
+        state.month_requests.append(now)
+        state.day_tokens += max(0, total_tokens)
+        state.month_tokens += max(0, total_tokens)
         if status_code == 429:
             state.blocked_until = max(state.blocked_until, now + 60)
         elif status_code in {401, 403}:
@@ -387,9 +395,9 @@ class QuotaManager:
             model_id=model_id,
             success=0,
             status_code=status_code,
-            prompt_tokens=0,
-            completion_tokens=0,
-            total_tokens=0,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
             latency_ms=latency_ms,
             fallback_count=fallback_count,
             error=(error or "")[:1000],
