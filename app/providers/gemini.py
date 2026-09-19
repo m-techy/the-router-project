@@ -9,7 +9,7 @@ from typing import Any, Callable
 
 import httpx
 
-from app.models import ChatCompletionRequest, ProviderSpec
+from app.models import ChatCompletionRequest, EmbeddingRequest, ProviderSpec
 from app.providers.base import ProviderAdapter, ProviderError
 from app.providers.openai_compatible import OpenAICompatibleAdapter
 
@@ -19,6 +19,73 @@ _COMPATIBILITY_FALLBACK_STATUSES = {400, 404, 405, 415, 422, 501}
 
 def _text_part(text: str) -> dict[str, Any]:
     return {"text": text}
+
+
+def _embedding_part(item: Any) -> dict[str, Any]:
+    if isinstance(item, str):
+        return {"text": item}
+    if not isinstance(item, dict):
+        return {"text": str(item)}
+
+    kind = item.get("type")
+    if kind in {"text", "input_text"}:
+        return {"text": str(item.get("text", ""))}
+
+    if kind == "image_url":
+        raw = item.get("image_url")
+        url = raw.get("url") if isinstance(raw, dict) else raw
+        if isinstance(url, str) and url.startswith("data:") and ";base64," in url:
+            header, data = url.split(",", 1)
+            mime = header[5:].split(";", 1)[0] or "image/jpeg"
+            return {"inlineData": {"mimeType": mime, "data": data}}
+        raise ProviderError(
+            "Gemini embedding routes accept inline data: image URLs only.",
+            422,
+        )
+
+    if kind in {"input_audio", "audio"}:
+        raw = item.get("input_audio") or item.get("audio") or {}
+        if not isinstance(raw, dict) or not raw.get("data"):
+            raise ProviderError("Gemini embedding audio requires base64 data.", 422)
+        fmt = str(raw.get("format") or "wav").lower()
+        mime = {
+            "mp3": "audio/mpeg",
+            "mpeg": "audio/mpeg",
+            "wav": "audio/wav",
+            "ogg": "audio/ogg",
+            "m4a": "audio/mp4",
+            "webm": "audio/webm",
+        }.get(fmt, f"audio/{fmt}")
+        return {"inlineData": {"mimeType": mime, "data": str(raw["data"])}}
+
+    if "text" in item:
+        return {"text": str(item["text"])}
+    raise ProviderError("Unsupported Gemini embedding input part.", 422)
+
+
+def _embedding_contents(value: Any) -> list[list[dict[str, Any]]]:
+    if isinstance(value, str):
+        return [[{"text": value}]]
+
+    if isinstance(value, dict):
+        parts = value.get("parts") if "parts" in value else [value]
+        if not isinstance(parts, list):
+            parts = [parts]
+        return [[_embedding_part(item) for item in parts]]
+
+    if isinstance(value, list):
+        if not value:
+            raise ProviderError("Embedding input cannot be empty.", 422)
+        if all(isinstance(item, str) for item in value):
+            return [[{"text": item}] for item in value]
+        if all(isinstance(item, dict) and "parts" in item for item in value):
+            return [
+                [_embedding_part(part) for part in item.get("parts") or []]
+                for item in value
+            ]
+        return [[_embedding_part(item) for item in value]]
+
+    return [[{"text": str(value)}]]
 
 
 def _content_parts(content: Any) -> list[dict[str, Any]]:
@@ -430,6 +497,79 @@ class GeminiNativeAdapter(ProviderAdapter):
 
         return native_response_to_openai(payload, model=model), response.headers
 
+    async def embeddings(
+        self,
+        provider: ProviderSpec,
+        model: str,
+        request: EmbeddingRequest,
+    ) -> tuple[dict[str, Any], httpx.Headers]:
+        contents = _embedding_contents(request.input)
+        common: dict[str, Any] = {}
+        if request.dimensions is not None:
+            common["outputDimensionality"] = request.dimensions
+
+        try:
+            if len(contents) == 1:
+                payload = {
+                    "content": {"parts": contents[0]},
+                    **common,
+                }
+                response = await self.client.post(
+                    f"{_NATIVE_ROOT}/models/{model}:embedContent",
+                    headers=self._headers(provider),
+                    json=payload,
+                )
+            else:
+                payload = {
+                    "requests": [
+                        {
+                            "model": f"models/{model}",
+                            "content": {"parts": parts},
+                            **common,
+                        }
+                        for parts in contents
+                    ]
+                }
+                response = await self.client.post(
+                    f"{_NATIVE_ROOT}/models/{model}:batchEmbedContents",
+                    headers=self._headers(provider),
+                    json=payload,
+                )
+        except httpx.HTTPError as exc:
+            raise ProviderError(str(exc), None) from exc
+
+        if response.status_code >= 400:
+            raise ProviderError(response.text[:1000], response.status_code)
+
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise ProviderError(
+                "Gemini embedding API returned a non-JSON response",
+                response.status_code,
+            ) from exc
+
+        raw_embeddings = payload.get("embeddings")
+        if raw_embeddings is None:
+            raw_embeddings = [payload.get("embedding") or {}]
+
+        data = []
+        for index, embedding in enumerate(raw_embeddings):
+            data.append(
+                {
+                    "object": "embedding",
+                    "index": index,
+                    "embedding": embedding.get("values") or [],
+                }
+            )
+
+        return {
+            "object": "list",
+            "data": data,
+            "model": model,
+            "usage": {"prompt_tokens": 0, "total_tokens": 0},
+        }, response.headers
+
     async def stream(
         self,
         provider: ProviderSpec,
@@ -519,3 +659,12 @@ class GeminiHybridAdapter(ProviderAdapter):
 
         async for chunk in self.native.stream(provider, model, request):
             yield chunk
+
+
+    async def embeddings(
+        self,
+        provider: ProviderSpec,
+        model: str,
+        request: EmbeddingRequest,
+    ) -> tuple[dict[str, Any], httpx.Headers]:
+        return await self.native.embeddings(provider, model, request)
