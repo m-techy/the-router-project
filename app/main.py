@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
+import httpx
 from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -14,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from .certification import certify_provider
 from .models import ChatCompletionRequest
 from .quota import QuotaManager
+from .quota_telemetry import QuotaTelemetry
 from .registry import ProviderRegistry
 from .router import FreeRouter, VIRTUAL_MODELS, request_requirements
 from .setup import SetupValue, configured_value, known_setup_keys, provider_setup_status
@@ -36,6 +38,7 @@ router = FreeRouter(
     quota,
     timeout=float(os.getenv("ROUTER_REQUEST_TIMEOUT", "120")),
 )
+quota_telemetry = QuotaTelemetry(router.client, store.get_secret)
 
 
 def env_bool(name: str, default: bool = False) -> bool:
@@ -334,6 +337,37 @@ async def route_preview(request: ChatCompletionRequest) -> dict[str, Any]:
             allow_promo=allow_promo,
         ),
     }
+
+
+@app.post("/api/providers/{provider_id}/quota/refresh")
+async def refresh_provider_quota(
+    provider_id: str,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    require_admin(authorization)
+    try:
+        registry.get(provider_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Unknown provider") from exc
+
+    try:
+        telemetry = await quota_telemetry.refresh(provider_id)
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Provider quota endpoint returned {exc.response.status_code}",
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail="Provider quota refresh failed") from exc
+
+    if telemetry is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No active quota telemetry endpoint is configured for this provider",
+        )
+
+    quota.merge_provider_telemetry(provider_id, telemetry)
+    return {"provider": provider_id, "telemetry": telemetry}
 
 
 @app.post("/api/providers/{provider_id}/certify")
