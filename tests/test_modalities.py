@@ -30,7 +30,7 @@ def test_new_provider_tiers_are_fail_safe():
     registry = ProviderRegistry(ROOT / "config" / "providers.yaml")
 
     assert registry.get("vercel-ai-gateway").tier == TierType.PERSISTENT_FREE
-    assert registry.get("huggingface").tier == TierType.PERSISTENT_FREE
+    assert registry.get("huggingface").tier == TierType.PROMOTIONAL
     assert registry.get("pollinations").tier == TierType.PROMOTIONAL
 
     default_ids = {
@@ -49,8 +49,9 @@ def test_new_provider_tiers_are_fail_safe():
     }
 
     assert "vercel-ai-gateway" in default_ids
-    assert "huggingface" in default_ids
+    assert "huggingface" not in default_ids
     assert "pollinations" not in default_ids
+    assert "huggingface" in promo_ids
     assert "pollinations" in promo_ids
 
 
