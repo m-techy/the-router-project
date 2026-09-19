@@ -5,5 +5,3 @@ candidates:
   - {id: minimax-platform, region: CN, status: review, reason: "Direct recurring-free entitlement needs verification."}
   - {id: moonshot-kimi, region: CN, status: review, reason: "Direct recurring-free Moonshot API needs verification."}
   - {id: modelscope, region: CN, status: review, reason: "Verify generally usable serverless inference quota."}
-  - {id: vercel-ai-gateway, region: global, status: review, reason: "Represent recurring allowance and zero-price models precisely before baseline activation."}
-  - {id: pollinations, region: global, status: conditional, reason: "Daily Pollen grants are conditional; not baseline yet."}
