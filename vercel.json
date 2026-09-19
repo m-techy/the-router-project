@@ -4,10 +4,5 @@
     "deploymentEnabled": {
       "dev": false
     }
-  },
-  "functions": {
-    "app/main.py": {
-      "maxDuration": 60
-    }
   }
 }
