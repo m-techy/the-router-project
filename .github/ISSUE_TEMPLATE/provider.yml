@@ -1,0 +1,110 @@
+name: Provider verification
+description: Propose a free provider or model for The Router's reviewed registry.
+title: "[provider] "
+labels:
+  - provider-review
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The Router treats provider discovery as evidence gathering, not automatic promotion.
+        Persistent-free entries must have recurring zero-price capacity that can be verified from current sources.
+
+  - type: input
+    id: provider
+    attributes:
+      label: Provider
+      placeholder: Example AI
+    validations:
+      required: true
+
+  - type: input
+    id: api
+    attributes:
+      label: API base URL
+      placeholder: https://api.example.com/v1
+    validations:
+      required: true
+
+  - type: input
+    id: docs
+    attributes:
+      label: Official API documentation
+      placeholder: https://docs.example.com/api
+    validations:
+      required: true
+
+  - type: input
+    id: free_evidence
+    attributes:
+      label: Official free-tier / pricing evidence
+      description: Link to the current provider page that proves the free entitlement.
+      placeholder: https://example.com/pricing
+    validations:
+      required: true
+
+  - type: dropdown
+    id: recurrence
+    attributes:
+      label: Free-capacity type
+      options:
+        - Recurring / persistent free
+        - Conditional recurring free
+        - Promotional / temporary
+        - Trial / expiring
+        - Unknown / needs research
+    validations:
+      required: true
+
+  - type: textarea
+    id: quota
+    attributes:
+      label: Quota details
+      description: Include RPM/RPD/tokens/credits, reset schedule, and whether limits are key/account/project/org scoped.
+      placeholder: "30 RPM per organization; resets continuously..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: models
+    attributes:
+      label: Reviewed free models
+      description: List exact model IDs and capabilities.
+      placeholder: |
+        model-id-1 — chat, tools, streaming
+        model-id-2 — embeddings
+    validations:
+      required: true
+
+  - type: dropdown
+    id: compatibility
+    attributes:
+      label: API dialect
+      options:
+        - OpenAI-compatible
+        - Gemini-native
+        - Custom adapter required
+        - Unknown
+    validations:
+      required: true
+
+  - type: textarea
+    id: live_check
+    attributes:
+      label: Live verification
+      description: Describe what you successfully tested and when. Never paste an API key.
+      placeholder: "2026-09-20: GET /models returned..."
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Contribution checks
+      options:
+        - label: I did not include secrets, tokens, cookies, or account identifiers.
+          required: true
+        - label: I understand that trial/promotional capacity will not enter free/* by default.
+          required: true
+        - label: I used exact provider/model IDs rather than guessed aliases.
+          required: true
