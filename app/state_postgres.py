@@ -95,6 +95,7 @@ CREATE INDEX IF NOT EXISTS idx_project_usage_project_ts
 class PostgresStateStore:
     backend_name = "postgres"
     durable = True
+    serverless_safe = True
 
     def __init__(self, dsn: str):
         if not dsn:
