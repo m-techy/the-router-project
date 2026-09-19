@@ -276,6 +276,8 @@
           <i>${esc(setup.transport || "direct")}</i>
           <i>promo ${setup.promo_enabled ? "on" : "off"}</i>
           <i>trial ${setup.trial_enabled ? "on" : "off"}</i>
+          <i>vault ${setup.vault?.enabled ? "on" : "off"}</i>
+          <i>projects ${setup.projects?.count || 0}</i>
           <i>${esc(setup.mode || "local-platform")}</i>
         </div>
       </div>
