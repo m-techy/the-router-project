@@ -8,16 +8,18 @@ The Router is a personal-first AI gateway for hobby projects, prototypes, agents
 
 ## What you get
 
-- OpenAI-compatible `POST /v1/chat/completions`, `POST /v1/embeddings`, and `POST /v1/audio/transcriptions`
+- OpenAI-compatible `POST /v1/chat/completions`, `POST /v1/responses`, `POST /v1/embeddings`, `POST /v1/audio/transcriptions`, and `POST /v1/images/generations`
 - chat routes: `free/auto`, `free/fast`, `free/smart`, `free/code`, `free/reasoning`, `free/vision`, `free/long`
 - embedding routes: `embed/auto`, `embed/text`, `embed/multimodal`
 - transcription routes: `transcribe/auto`, `transcribe/fast`, `transcribe/accurate`
+- image routes: `image/auto`, `image/fast`, `image/quality`
+- persistent custom chat routes such as `route/my-app`
 - automatic provider/model fallback before a response begins
 - capability-aware routing for tools, JSON, vision, coding, reasoning, and context size
 - persistent SQLite usage ledger, request traces, and provider health state
 - quota-aware scoring with provider rate-limit header reconciliation
 - provider certification states: `active`, `retry_later`, `configured`, `quarantine`
-- browser dashboard with first-run setup, provider inventory, playground, usage, and fallback traces
+- browser control plane with first-run setup, provider inventory, custom route profiles, System Doctor, playground, usage, and fallback traces
 - recurring-free, promotional, and trial pools kept separate
 - upstream watchlist so we inspect existing fixes before writing our own
 - safe `free-coding-models` catalog reconciliation without executing upstream JavaScript
@@ -26,6 +28,7 @@ The Router is a personal-first AI gateway for hobby projects, prototypes, agents
 - optional Fernet-encrypted local credential vault
 - per-project router API keys with daily request/token limits
 - live local SSE usage stream and safe config export/import
+- session-only browser admin unlock and project-key-aware Playground/snippets
 
 ## Run locally
 
@@ -160,6 +163,33 @@ print(transcript.text)
 
 `transcribe/fast` favors observed latency; `transcribe/accurate` gives more weight to model quality. The initial v0.4 pool uses Groq's reviewed Whisper models.
 
+### Responses compatibility
+
+Stateless Responses-style requests can use the same base URL:
+
+```python
+response = client.responses.create(
+    model="free/auto",
+    instructions="Be concise.",
+    input="Explain vector databases in two sentences.",
+)
+print(response.output_text)
+```
+
+The compatibility layer maps text, messages, function tools, function-call history, JSON response formats, and text streaming onto the Router's existing multi-provider chat engine. Features that require server-side OpenAI state are deliberately rejected: `previous_response_id`, Conversations, background jobs, and `store=true`. Streaming with function-tool deltas is also rejected for now instead of returning an incomplete event stream.
+
+### Image generation
+
+```python
+image = client.images.generate(
+    model="image/auto",
+    prompt="A tiny robot repairing a telescope at night",
+)
+print(image.data[0].b64_json)
+```
+
+The initial reviewed image pool routes to Cloudflare Workers AI FLUX.1 Schnell. The Router returns base64 JPEG output and tracks a conservative daily-neuron reservation so the Cloudflare free allocation remains part of the zero-cost boundary. Unsupported size, transparent-background, URL-output, and multi-image requests fail explicitly.
+
 ## Web platform
 
 The browser UI is the primary control plane, not an optional demo. It provides first-run provider setup, generated SDK snippets, an in-app usage guide, quota/health visibility, certification probes, model inventory, route previews, an interactive playground, persistent request traces, and a review queue for upstream model changes.
@@ -212,6 +242,16 @@ The PostgreSQL backend persists the same usage, quota, health, settings, encrypt
 On Vercel, hosted inference remains fail-closed until **all** security gates are satisfied: serverless-safe Postgres, `ROUTER_VAULT_KEY`, `ROUTER_ADMIN_KEY`, `ROUTER_REQUIRE_PROJECT_KEYS=true`, at least one issued router project key, and `ROUTER_ENABLE_HOSTED_API=true`.
 
 Use `GET /api/hosted/readiness` to see each gate without exposing secret values.
+
+## v0.8 control plane + compatibility
+
+The dashboard now includes **Routes** and **Doctor**.
+
+Custom routes are persisted as normal Router settings and show up in `/v1/models`. A profile such as `route/my-app` can choose a base strategy, allow/deny providers, require a minimum context window, cap fallback depth, and explicitly opt into promotional or trial capacity.
+
+`GET /api/doctor` performs a no-inference readiness pass over provider capacity, fallback redundancy, credential encryption state, registry freshness, `free/auto` availability, project isolation, custom routes, and hosted safety.
+
+If `ROUTER_ADMIN_KEY` is configured, the browser control plane can be unlocked for the current tab. The value is held only in session storage. A newly created project key is also attached to the Playground for the current tab so requests can be attributed to that project.
 
 ## Vercel
 
@@ -347,6 +387,8 @@ uvicorn app.main:app --reload --port 4010
 | Endpoint | Purpose |
 |---|---|
 | `POST /v1/chat/completions` | OpenAI-compatible routed completion |
+| `POST /v1/responses` | Stateless Responses-compatible text/function routing |
+| `POST /v1/images/generations` | Quota-aware image generation through `image/*` routes |
 | `POST /v1/embeddings` | Quota-aware embeddings through `embed/*` routes |
 | `POST /v1/audio/transcriptions` | Routed audio transcription through `transcribe/*` routes |
 | `GET /v1/models` | Virtual routes + reviewed provider/model IDs |
@@ -355,6 +397,9 @@ uvicorn app.main:app --reload --port 4010
 | `GET /api/setup/status` | Plug-and-play readiness / missing provider keys |
 | `GET /api/adapters` | Adapter SDK version and registered modality capabilities |
 | `GET /api/hosted/readiness` | Hosted state/auth/encryption readiness gates |
+| `GET /api/doctor` | No-inference readiness and safety diagnostics |
+| `GET/POST /api/routes` | List/create persistent custom chat route profiles |
+| `DELETE /api/routes/{slug}` | Delete a custom route profile |
 | `GET /api/vault/status` | Local credential-vault status without exposing secrets |
 | `GET/POST /api/projects` | List or create hashed local router project keys |
 | `DELETE /api/projects/{id}` | Revoke a local project key |
