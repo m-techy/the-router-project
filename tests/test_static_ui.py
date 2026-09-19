@@ -78,3 +78,10 @@ def test_public_bento_is_five_intentional_cards():
     block = html.split('<div class="system-bento">', 1)[1].split("</div>", 1)[0]
     # Use article class markers rather than visual text so copy can evolve safely.
     assert html.count('class="bento ') == 5
+
+
+
+def test_dashboard_never_calls_foreach_on_single_selector_helper():
+    js = (ROOT / "app" / "static" / "app.js").read_text(encoding="utf-8")
+    bad = re.findall(r'(?<!\$)\$\("[^"]+"\)\.forEach', js)
+    assert not bad, f"Use querySelectorAll/$$ for collections, found: {bad}"
