@@ -9,12 +9,13 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from fastapi import FastAPI, Header, HTTPException, Request, Response
+from fastapi import FastAPI, File, Form, Header, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .certification import certify_provider
-from .models import ChatCompletionRequest
+from .modalities import EMBEDDING_MODELS, TRANSCRIPTION_MODELS, ModalityRouter
+from .models import ChatCompletionRequest, EmbeddingRequest
 from .quota import QuotaManager
 from .quota_telemetry import QuotaTelemetry
 from .registry import ProviderRegistry, model_is_current
@@ -39,6 +40,7 @@ router = FreeRouter(
     quota,
     timeout=float(os.getenv("ROUTER_REQUEST_TIMEOUT", "120")),
 )
+modalities = ModalityRouter(router)
 quota_telemetry = QuotaTelemetry(router.client, store.get_secret)
 
 
@@ -165,7 +167,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(
     title="The Router",
     description="Free-tier-aware multi-provider AI router",
-    version="0.3.0",
+    version="0.4.0",
     lifespan=lifespan,
 )
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -202,7 +204,7 @@ async def setup_snippets(request: Request) -> dict[str, Any]:
     return {
         "base_url": f"{public_base_url(request)}/v1",
         "snippets": client_snippets(public_base_url(request)),
-        "virtual_models": sorted(VIRTUAL_MODELS),
+        "virtual_models": sorted(VIRTUAL_MODELS | EMBEDDING_MODELS | TRANSCRIPTION_MODELS),
     }
 
 
@@ -296,7 +298,7 @@ async def quota_status() -> dict[str, Any]:
 async def models() -> dict[str, Any]:
     data = [
         {"id": model, "object": "model", "owned_by": "the-router"}
-        for model in sorted(VIRTUAL_MODELS)
+        for model in sorted(VIRTUAL_MODELS | EMBEDDING_MODELS | TRANSCRIPTION_MODELS)
     ]
     for provider in registry.providers:
         for model in provider.models:
@@ -449,6 +451,88 @@ async def env_requirements() -> dict[str, Any]:
             for provider in registry.providers
         ]
     }
+
+
+@app.post("/v1/embeddings")
+async def embeddings(
+    request: EmbeddingRequest,
+    response: Response,
+):
+    if IS_VERCEL and not env_bool("ROUTER_ENABLE_HOSTED_API"):
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Hosted router API is disabled on this Vercel deployment. "
+                "Run The Router locally for durable quota and credential state."
+            ),
+        )
+
+    allow_trial, allow_promo = route_flags(request.model)
+    try:
+        routed = await modalities.embeddings(
+            request,
+            allow_trial=allow_trial,
+            allow_promo=allow_promo,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    response.headers["x-router-provider"] = routed.provider
+    response.headers["x-router-model"] = routed.model
+    response.headers["x-router-fallback-count"] = str(routed.fallback_count)
+    response.headers["x-router-reason"] = routed.route_reason
+    return routed.body
+
+
+@app.post("/v1/audio/transcriptions")
+async def audio_transcriptions(
+    file: UploadFile = File(...),
+    model: str = Form("transcribe/auto"),
+    language: str | None = Form(default=None),
+    prompt: str | None = Form(default=None),
+    response_format: str = Form(default="json"),
+    temperature: float | None = Form(default=None),
+):
+    if IS_VERCEL and not env_bool("ROUTER_ENABLE_HOSTED_API"):
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Hosted router API is disabled on this Vercel deployment. "
+                "Run The Router locally for durable quota and credential state."
+            ),
+        )
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Audio file is empty")
+
+    allow_trial, allow_promo = route_flags(model)
+    try:
+        routed = await modalities.transcription(
+            requested_model=model,
+            filename=file.filename or "audio.bin",
+            data=content,
+            content_type=file.content_type or "application/octet-stream",
+            language=language,
+            prompt=prompt,
+            response_format=response_format,
+            temperature=temperature,
+            allow_trial=allow_trial,
+            allow_promo=allow_promo,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return Response(
+        content=routed.content,
+        media_type=routed.content_type.split(";", 1)[0],
+        headers={
+            "x-router-provider": routed.provider,
+            "x-router-model": routed.model,
+            "x-router-fallback-count": str(routed.fallback_count),
+            "x-router-reason": routed.route_reason,
+        },
+    )
 
 
 @app.post("/v1/chat/completions")
