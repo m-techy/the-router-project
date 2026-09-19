@@ -278,6 +278,7 @@
           <i>trial ${setup.trial_enabled ? "on" : "off"}</i>
           <i>vault ${setup.vault?.enabled ? "on" : "off"}</i>
           <i>projects ${setup.projects?.count || 0}</i>
+          <i>state ${esc(setup.state?.backend || "sqlite")}</i>
           <i>${esc(setup.mode || "local-platform")}</i>
         </div>
       </div>
