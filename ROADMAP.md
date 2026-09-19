@@ -58,6 +58,17 @@
 - [x] fail-closed hosted routing readiness checks
 - [x] real PostgreSQL integration coverage in CI
 
+## v0.8 — control plane + compatibility
+- [x] System Doctor readiness/safety diagnostics
+- [x] persistent custom `route/*` profiles with provider/context/fallback policy
+- [x] stateless OpenAI Responses API compatibility
+- [x] quota-aware `/v1/images/generations` with reviewed Cloudflare FLUX capacity
+- [x] conservative Cloudflare daily-neuron accounting
+- [x] streamed token accounting for provider quotas and project limits
+- [x] session-only dashboard admin unlock
+- [x] project-key-aware Playground and generated client snippets
+- [x] dashboard interaction contract regression tests
+
 ## v1.0 — hosted without sacrificing self-hosting
 - [ ] hosted control-plane UI while preserving the public project site
 - [ ] hosted-safe live events / realtime usage updates
