@@ -35,6 +35,7 @@
       <div class="command-status">
         <span class="dot" id="healthDot"></span>
         <span id="healthLabel">Checking router…</span>
+        <button type="button" id="adminUnlockBtn" class="header-action" aria-label="Unlock admin controls">Admin</button>
         <button type="button" id="refreshBtn" class="icon-button" aria-label="Refresh router state">↻</button>
       </div>
     </header>
@@ -373,6 +374,23 @@
       </section>
     </main>
   </div>
+
+  <dialog id="adminDialog" class="admin-dialog">
+    <form method="dialog" class="admin-dialog-card">
+      <div>
+        <span>Session-only admin access</span>
+        <strong>Unlock protected controls</strong>
+        <p>The key is kept only in this browser tab's session storage and is never sent anywhere except this Router origin.</p>
+      </div>
+      <label>ROUTER_ADMIN_KEY
+        <input id="adminKeyInput" type="password" autocomplete="off" placeholder="Admin key" />
+      </label>
+      <div class="admin-dialog-actions">
+        <button type="button" id="clearAdminKey" class="secondary-action">Clear key</button>
+        <button type="button" id="saveAdminKey" class="primary-action">Use for this session</button>
+      </div>
+    </form>
+  </dialog>
 
   <div id="toastHost" class="toast-host" aria-live="polite"></div>
 
