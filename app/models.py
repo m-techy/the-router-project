@@ -112,6 +112,41 @@ class EmbeddingRequest(BaseModel):
     user:str|None=None
     model_config={"extra":"allow"}
 
+class ImageGenerationRequest(BaseModel):
+    model: str = "image/auto"
+    prompt: str = Field(min_length=1, max_length=32000)
+    n: int = Field(default=1, ge=1, le=10)
+    size: str | None = None
+    quality: str | None = None
+    response_format: Literal["b64_json", "url"] | None = "b64_json"
+    background: Literal["transparent", "opaque", "auto"] | None = None
+    output_format: Literal["png", "jpeg", "webp"] | None = None
+    seed: int | None = Field(default=None, ge=0)
+    user: str | None = None
+    model_config = {"extra": "allow"}
+
+
+class ResponseCreateRequest(BaseModel):
+    model: str = "free/auto"
+    input: Any
+    instructions: str | None = None
+    stream: bool = False
+    temperature: float | None = None
+    top_p: float | None = None
+    max_output_tokens: int | None = Field(default=None, ge=1)
+    tools: list[dict[str, Any]] | None = None
+    tool_choice: Any | None = None
+    text: dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
+    user: str | None = None
+    store: bool | None = None
+    parallel_tool_calls: bool | None = None
+    previous_response_id: str | None = None
+    conversation: Any | None = None
+    background: bool | None = None
+    model_config = {"extra": "allow"}
+
+
 class Candidate(BaseModel):
     provider_id:str
     model_id:str
