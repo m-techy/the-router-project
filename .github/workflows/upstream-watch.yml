@@ -17,13 +17,28 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install PyYAML
+      - name: Install router
+        run: pip install -e .
       - name: Check watched upstreams
         id: watch
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/check_upstreams.py --report upstream-report.md
+      - name: Snapshot free-coding-models catalog
+        run: |
+          python scripts/fcm_discovery.py
+          python scripts/reconcile_fcm.py
+      - name: Upload catalog reconciliation
+        uses: actions/upload-artifact@v4
+        with:
+          name: free-model-catalog-review
+          path: |
+            runtime/fcm-manifest.json
+            runtime/fcm-reconciliation.json
+            runtime/fcm-providers.md
+          if-no-files-found: error
+          retention-days: 14
       - name: Open issue when upstreams changed
         if: steps.watch.outcome == 'failure'
         env:
