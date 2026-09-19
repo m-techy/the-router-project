@@ -1,6 +1,6 @@
 [project]
 name = "the-router-project"
-version = "0.4.0"
+version = "0.5.0"
 description = "Plug-and-play free-tier-aware AI router with an OpenAI-compatible API, dashboard, playground, quota tracking, request traces, and provider health certification."
 requires-python = ">=3.11"
 dependencies = [
