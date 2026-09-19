@@ -44,9 +44,15 @@
 - [x] export/import config with secrets excluded by default
 - [x] provider configuration writes through the local dashboard without exposing secrets
 
-## v1.0
-- [ ] one-command installers for Linux/macOS/Windows
-- [ ] signed provider registry releases
-- [ ] stable provider adapter SDK
-- [ ] community contribution workflow for free-provider verification
-- [ ] optional hosted control plane while preserving self-hosting
+## v0.6 — distribution & ecosystem
+- [x] one-command installers for Linux/macOS/Windows
+- [x] cryptographically attested provider registry releases
+- [x] stable provider adapter SDK v1
+- [x] community contribution workflow for free-provider verification
+- [x] registry validation enforced in CI
+
+## v1.0 — hosted without sacrificing self-hosting
+- [ ] durable remote state abstraction for hosted deployments
+- [ ] encrypted hosted secret storage
+- [ ] optional hosted control plane while preserving the local-first data plane
+- [ ] hosted project/auth management without changing local defaults
