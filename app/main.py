@@ -16,7 +16,7 @@ from .certification import certify_provider
 from .models import ChatCompletionRequest
 from .quota import QuotaManager
 from .quota_telemetry import QuotaTelemetry
-from .registry import ProviderRegistry
+from .registry import ProviderRegistry, model_is_current
 from .router import FreeRouter, VIRTUAL_MODELS, request_requirements
 from .setup import SetupValue, configured_value, known_setup_keys, provider_setup_status
 from .state import StateStore
@@ -264,7 +264,10 @@ async def providers() -> dict[str, Any]:
                 "docs_url": provider.docs_url,
                 "signup_url": provider.signup_url,
                 "models": [
-                    model.model_dump()
+                    {
+                        **model.model_dump(),
+                        "current": model_is_current(model),
+                    }
                     for model in provider.models
                     if model.enabled and model.free
                 ],
@@ -296,7 +299,7 @@ async def models() -> dict[str, Any]:
     ]
     for provider in registry.providers:
         for model in provider.models:
-            if model.free and model.enabled:
+            if model.free and model.enabled and model_is_current(model):
                 data.append(
                     {
                         "id": f"{provider.id}/{model.id}",
