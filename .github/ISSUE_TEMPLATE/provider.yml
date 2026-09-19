@@ -1,8 +1,6 @@
 name: Provider verification
 description: Propose a free provider or model for The Router's reviewed registry.
 title: "[provider] "
-labels:
-  - provider-review
 body:
   - type: markdown
     attributes:
