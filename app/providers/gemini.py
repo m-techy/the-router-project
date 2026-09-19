@@ -10,7 +10,7 @@ from typing import Any, Callable
 import httpx
 
 from app.models import ChatCompletionRequest, EmbeddingRequest, ProviderSpec
-from app.providers.base import ProviderAdapter, ProviderError
+from app.providers.base import AdapterCapabilities, ProviderAdapter, ProviderError
 from app.providers.openai_compatible import OpenAICompatibleAdapter
 
 _NATIVE_ROOT = "https://generativelanguage.googleapis.com/v1beta"
@@ -442,6 +442,8 @@ def native_chunk_to_openai(
 
 
 class GeminiNativeAdapter(ProviderAdapter):
+    capabilities = AdapterCapabilities(embeddings=True)
+
     def __init__(
         self,
         client: httpx.AsyncClient,
@@ -614,6 +616,8 @@ class GeminiNativeAdapter(ProviderAdapter):
 
 
 class GeminiHybridAdapter(ProviderAdapter):
+    capabilities = AdapterCapabilities(embeddings=True)
+
     """Prefer Gemini's OpenAI facade, then use native REST for compatibility gaps."""
 
     def __init__(
