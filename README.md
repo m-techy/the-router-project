@@ -21,25 +21,32 @@ The Router is a personal-first AI gateway for hobby projects, prototypes, agents
 - safe `free-coding-models` catalog reconciliation without executing upstream JavaScript
 - optional Bifrost transport for mature provider normalization while keeping the default install lightweight
 
-## Plug-and-play start
+## One-command start
+
+After cloning the repository, the platform starts with one command and does **not** require an `.env` file:
 
 ```bash
-git clone https://github.com/m-techy/the-router-project.git
-cd the-router-project
-cp .env.example .env
-
-# Optional: add whichever provider keys you already have.
-# Kilo, LLM7, and OVH sandbox can provide no-key/optional-key capacity.
 docker compose up --build
 ```
 
-Open `http://localhost:4010`.
+Or clone and start in one shell command:
 
-The **Setup** page shows:
-- how many provider pools are ready
-- which provider keys are still missing
-- direct signup/docs links
-- copy-paste Python, JavaScript, and cURL clients
+```bash
+git clone https://github.com/m-techy/the-router-project.git && cd the-router-project && docker compose up --build
+```
+
+Then open `http://localhost:4010`.
+
+The web console contains:
+
+- **Setup** — add/remove provider credentials from the browser.
+- **Guide** — install, routing, integration, and zero-cost behavior explained.
+- **Providers** — model inventory, live quota telemetry where supported, health, and certification.
+- **Playground** — preview routes and test prompts.
+- **Usage & traces** — persistent request history and fallback chains.
+- **Catalog review** — inspect upstream free-model additions/removals before promotion.
+
+Provider credentials saved through Setup stay in the local Docker volume. The local store is not encrypted at rest yet; environment variables still take precedence and are preferred for shared/remote deployments.
 
 OpenAI base URL:
 
@@ -67,45 +74,23 @@ print(response.choices[0].message.content)
 
 Your app does not need to know whether the request actually ran on Groq, Gemini, Cerebras, Z.AI, Kilo, OVH, or another configured pool.
 
-## Dashboard and playground
+## Web platform
 
-The built-in platform UI runs on the same port as the API.
+The browser UI is the primary control plane, not an optional demo. It provides first-run provider setup, generated SDK snippets, an in-app usage guide, quota/health visibility, certification probes, model inventory, route previews, an interactive playground, persistent request traces, and a review queue for upstream model changes.
 
-**Overview**
-- configured provider count
-- persistent-free pools
-- free model count
-- quota headroom
-- recent routes
+Provider credential values are never returned to the browser after they are saved. Locally saved credentials live in the SQLite-backed router data volume and are **not encrypted at rest yet**; use environment variables for shared or remote deployments.
 
-**Setup**
-- first-run readiness score
-- missing provider credentials and local/env configuration source
-- provider signup/docs shortcuts
-- local browser setup for personal self-hosting (stored in local SQLite; not encrypted at rest yet)
-- OpenAI SDK connection snippets
+## Vercel
 
-**Providers**
-- persistent / promotional / trial classification
-- certification state
-- quota headroom
-- currently reviewed free models
-- one-click live probe
+This repository can also be connected to Vercel. On Vercel, The Router intentionally serves a **public project/docs site** by default.
 
-**Playground**
-- virtual route selection
-- route preview before inference
-- model scoring reasons
-- temperature and max-token controls
-- selected provider/model and fallback count
+FastAPI and streaming can run on Vercel, but the current full router uses a local SQLite usage/quota ledger and local credential store. Those are not a durable state layer for serverless Functions, so the hosted routing API is disabled by default.
 
-**Usage & traces**
-- SQLite-backed request ledger
-- tokens and latency
-- per-request fallback chain
-- provider errors before the final successful route
+A future hosted mode should use a durable remote backend such as Postgres/Redis before enabling `ROUTER_ENABLE_HOSTED_API=true`.
 
-Provider keys are never rendered back in the dashboard. For personal local installs they can be saved through Setup into the local SQLite secret store; that store is **not encrypted at rest yet**, so environment variables are preferred for shared/remote deployments.
+The repository's `vercel.json` disables Vercel deployments for the `dev` branch, so development commits do not create preview builds. Production continues to deploy from `main`.
+
+See `docs/DEPLOYMENT.md` for the deployment split.
 
 ## Provider coverage
 

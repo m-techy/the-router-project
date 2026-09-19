@@ -16,6 +16,7 @@
       <nav>
         <button class="nav active" data-view="overview">Overview</button>
         <button class="nav" data-view="setup">Setup</button>
+        <button class="nav" data-view="guide">Guide</button>
         <button class="nav" data-view="providers">Providers</button>
         <button class="nav" data-view="playground">Playground</button>
         <button class="nav" data-view="usage">Usage & traces</button>
@@ -63,6 +64,17 @@
       </section>
 
       <section id="setup" class="view">
+        <div class="setup-banner">
+          <div>
+            <span class="eyebrow">FIRST RUN</span>
+            <h2>Start the router, then configure everything here.</h2>
+            <p>No config file is required. Add provider credentials in this page, test them, and copy the generated client snippet into any hobby project.</p>
+          </div>
+          <div class="setup-command">
+            <span>RUN</span>
+            <code>docker compose up --build</code>
+          </div>
+        </div>
         <div class="setup-grid">
           <article class="panel">
             <div class="panel-head"><h3>Readiness</h3><span>first-run status</span></div>
@@ -83,6 +95,31 @@
           <div class="panel-head"><h3>Increase free capacity</h3><span>environment variables or your local setup store</span></div>
           <div class="setup-note">Provider credentials saved here stay on this router instance and are never echoed back to the browser. The local store is not encrypted at rest yet; environment variables still take precedence.</div><div id="setupMissing" class="setup-list"></div>
         </article>
+      </section>
+
+      <section id="guide" class="view">
+        <div class="guide-hero">
+          <span class="eyebrow">QUICK GUIDE</span>
+          <h2>From zero to a routed AI call in five steps.</h2>
+          <p>Your project only needs one OpenAI-compatible base URL. Provider selection, quota tracking, model health, and fallback stay behind The Router.</p>
+        </div>
+        <div class="guide-steps">
+          <article class="guide-step"><b>1</b><div><h3>Run it</h3><p>Clone the repository and run <code>docker compose up --build</code>. Open <code>http://localhost:4010</code>.</p></div></article>
+          <article class="guide-step"><b>2</b><div><h3>Add providers</h3><p>Open <strong>Setup</strong>. Paste any API keys you have. More recurring-free providers means more capacity and better fallback coverage.</p></div></article>
+          <article class="guide-step"><b>3</b><div><h3>Test in Playground</h3><p>Use <code>free/auto</code> normally, or select <code>free/fast</code>, <code>free/smart</code>, <code>free/code</code>, <code>free/reasoning</code>, <code>free/vision</code>, or <code>free/long</code>.</p></div></article>
+          <article class="guide-step"><b>4</b><div><h3>Point your app at it</h3><p>Keep the OpenAI SDK and change its base URL to <code>http://localhost:4010/v1</code>. The client API key can be a placeholder such as <code>local</code>.</p></div></article>
+          <article class="guide-step"><b>5</b><div><h3>Watch routing</h3><p>Providers shows supported quota telemetry and model health. Usage & traces shows each fallback attempt. Catalog review shows upstream model changes before they become routable.</p></div></article>
+        </div>
+        <div class="grid two guide-bottom">
+          <article class="panel">
+            <div class="panel-head"><h3>Zero-cost rules</h3><span>default behavior</span></div>
+            <p class="guide-copy"><code>free/*</code> routes only use reviewed persistent-free pools. Trial and promotional providers stay out unless you explicitly call <code>trial/auto</code> or <code>promo/auto</code>.</p>
+          </article>
+          <article class="panel">
+            <div class="panel-head"><h3>Vercel deployment</h3><span>public site mode</span></div>
+            <p class="guide-copy">Vercel serves the public project/docs page by default. The durable router remains self-hosted until a remote state backend replaces local SQLite for hosted mode.</p>
+          </article>
+        </div>
       </section>
 
       <section id="providers" class="view">

@@ -4,12 +4,23 @@ services:
     ports:
       - "4010:4010"
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       ROUTER_DB_PATH: /data/router.db
     volumes:
       - router-data:/data
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4010/health', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   bifrost:
     image: maximhq/bifrost:latest

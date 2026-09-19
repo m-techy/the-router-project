@@ -8,6 +8,8 @@ providers:
     priority: 1.20
     confidence: high
     verification: official-rate-limits + free-coding-models-live
+    signup_url: https://console.groq.com/keys
+    docs_url: https://console.groq.com/docs/quickstart
     quota: {scope: organization, rpm: 30, source: "model-specific; reconcile response headers"}
     models:
       - id: openai/gpt-oss-120b
@@ -29,6 +31,8 @@ providers:
     priority: 1.20
     confidence: high
     verification: official-rate-limits + free-coding-models-live
+    signup_url: https://cloud.cerebras.ai/
+    docs_url: https://inference-docs.cerebras.ai/quickstart
     quota: {scope: account, source: "recurring free developer tier; model-specific limits"}
     models:
       - id: gpt-oss-120b
@@ -50,6 +54,8 @@ providers:
     priority: 1.18
     confidence: high
     verification: official-docs + free-coding-models-live
+    signup_url: https://aistudio.google.com/apikey
+    docs_url: https://ai.google.dev/gemini-api/docs/api-key
     quota: {scope: project, source: "free quotas vary by model/project"}
     notes: ["Review free-tier data handling terms before sending sensitive data."]
     models:
@@ -72,6 +78,8 @@ providers:
     priority: 1.02
     confidence: high
     verification: official-docs + free-coding-models-live
+    signup_url: https://dash.cloudflare.com/
+    docs_url: https://developers.cloudflare.com/workers-ai/get-started/rest-api/
     quota: {scope: account, neurons_per_day: 10000, reset_timezone: UTC, reset_hour: 0}
     models:
       - id: "@cf/openai/gpt-oss-20b"
@@ -91,6 +99,8 @@ providers:
     priority: 0.93
     confidence: high
     verification: official-pricing + free-coding-models-live
+    signup_url: https://openrouter.ai/settings/keys
+    docs_url: https://openrouter.ai/docs/quickstart
     quota: {scope: account, rpm: 20, rpd: 50, reset_timezone: UTC, reset_hour: 0}
     models:
       - id: z-ai/glm-5.2:free
@@ -112,6 +122,8 @@ providers:
     priority: 1.06
     confidence: medium
     verification: official-pricing + free-coding-models-live
+    signup_url: https://console.mistral.ai/
+    docs_url: https://docs.mistral.ai/admin/identity-access/api-keys
     quota: {scope: account, monthly_credits_usd: 10}
     models:
       - id: mistral-large-3-25-12
@@ -191,6 +203,8 @@ providers:
     priority: 1.08
     confidence: medium
     verification: NVIDIA catalog + free-coding-models-live
+    signup_url: https://build.nvidia.com/settings/api-keys
+    docs_url: https://build.nvidia.com/
     quota: {scope: account, monthly_requests: 1000}
     models:
       - id: deepseek-ai/deepseek-v4-flash-0731
@@ -229,6 +243,8 @@ providers:
     priority: 0.96
     confidence: medium
     verification: free-coding-models-live
+    signup_url: https://app.kilo.ai/
+    docs_url: https://kilo.ai/docs/gateway/authentication
     quota: {scope: provider, source: "no-key free router when offered"}
     models:
       - id: kilo-auto/free
@@ -287,6 +303,8 @@ providers:
     priority: 0.94
     confidence: medium
     verification: free-coding-models-live
+    signup_url: https://app.requesty.ai/
+    docs_url: https://docs.requesty.ai/
     quota: {scope: account, rpd: 200, source: "zero-price models only"}
     models:
       - id: nvidia/nemotron-3-ultra-550b-a55b

@@ -61,6 +61,7 @@ def provider_setup_status(
                     "secret": True,
                     "configured": configured_value(store, provider.env_key),
                     "source": value_source(store, provider.env_key),
+                    "optional": provider.auth == "optional_bearer",
                 }
             )
 
@@ -80,6 +81,7 @@ def provider_setup_status(
                     "secret": "KEY" in key or "TOKEN" in key or "SECRET" in key,
                     "configured": configured_value(store, key),
                     "source": value_source(store, key),
+                    "optional": False,
                 }
             )
 

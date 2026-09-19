@@ -34,7 +34,8 @@ Build a plug-and-play AI router that lets personal/hobby projects consume legiti
 - `config/upstreams.yaml` — projects to inspect before solving known gateway/provider problems
 - `scripts/fcm_discovery.py` — snapshots upstream reference files only
 - `scripts/reconcile_fcm.py` — review-only catalog diff; never edits the registry
-- `app/static/` — dashboard, setup flow, playground, usage/request traces
+- `app/static/` — local dashboard/setup/guide/playground/catalog/usage views plus the Vercel public site
+- `docs/DEPLOYMENT.md` — authoritative local-vs-hosted deployment split
 
 ## Provider addition workflow
 
@@ -85,3 +86,14 @@ python scripts/reconcile_fcm.py
 - dashboard/API still loads
 - discovery output cannot silently change the routing pool
 - upstream/license implications were considered
+
+
+## Branch and deployment workflow
+
+When Vercel is connected to this repository:
+
+- develop on `dev`
+- keep Vercel deployment disabled for `dev`
+- require CI to pass before merging
+- merge to `main` once per release-sized batch
+- do not bypass the local-vs-hosted state boundary merely to make Vercel routing appear functional
