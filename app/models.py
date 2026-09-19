@@ -123,7 +123,7 @@ class ImageGenerationRequest(BaseModel):
     output_format: Literal["png", "jpeg", "webp"] | None = None
     seed: int | None = Field(default=None, ge=0)
     user: str | None = None
-    model_config = {"extra": "allow"}
+    model_config = {"extra": "forbid"}
 
 
 class ResponseCreateRequest(BaseModel):
@@ -144,7 +144,7 @@ class ResponseCreateRequest(BaseModel):
     previous_response_id: str | None = None
     conversation: Any | None = None
     background: bool | None = None
-    model_config = {"extra": "allow"}
+    model_config = {"extra": "forbid"}
 
 
 class Candidate(BaseModel):
