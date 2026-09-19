@@ -1,7 +1,8 @@
+import datetime as dt
 from pathlib import Path
 from app.models import ChatCompletionRequest, ChatMessage, TierType
 from app.quota import QuotaManager
-from app.registry import ProviderRegistry
+from app.registry import ProviderRegistry, model_is_current
 from app.router import FreeRouter, request_requirements
 from app.state import StateStore
 ROOT=Path(__file__).resolve().parents[1]
@@ -76,3 +77,15 @@ def test_model_runtime_survives_restart(tmp_path):
     assert not quota.model_available("provider-x", "retired-model")
     assert quota.model_available("provider-x", "healthy-model")
     store.close()
+
+
+def test_promotional_expiry_fails_closed():
+    from app.models import ModelSpec
+
+    now = dt.datetime(2026, 9, 19, tzinfo=dt.timezone.utc)
+    active = ModelSpec(id="active", promotional_expires_at="2026-09-20T00:00:00Z")
+    expired = ModelSpec(id="expired", promotional_expires_at="2026-09-18T00:00:00Z")
+    malformed = ModelSpec(id="bad", promotional_expires_at="not-a-date")
+    assert model_is_current(active, now)
+    assert not model_is_current(expired, now)
+    assert not model_is_current(malformed, now)
