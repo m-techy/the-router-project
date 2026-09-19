@@ -221,6 +221,11 @@ class OpenAICompatibleAdapter(ProviderAdapter):
                 "Cloudflare FLUX does not expose transparent background control.",
                 422,
             )
+        if request.output_format not in {None, "jpeg"}:
+            raise ProviderError(
+                "Cloudflare FLUX returns JPEG; png/webp output is not supported by this route.",
+                422,
+            )
         if request.response_format == "url":
             raise ProviderError(
                 "Cloudflare FLUX returns image bytes/base64, not a hosted result URL.",
