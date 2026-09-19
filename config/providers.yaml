@@ -171,7 +171,7 @@ providers:
 
   - id: huggingface
     name: Hugging Face Inference Providers
-    tier: persistent_free
+    tier: promotional
     env_key: HF_TOKEN
     base_url: https://router.huggingface.co/v1
     priority: 0.42
@@ -180,7 +180,7 @@ providers:
     signup_url: https://huggingface.co/settings/tokens
     docs_url: https://huggingface.co/docs/inference-providers/guides/llm
     quota: {scope: account, monthly_credits_usd: 0.10, source: "recurring monthly free-user credits; intentionally low-priority"}
-    notes: ["Tiny recurring allowance; retained as emergency fallback rather than primary capacity."]
+    notes: ["Tiny recurring allowance; opt-in only because usage can consume purchased credits after the free allowance is exhausted."]
     models:
       - id: openai/gpt-oss-120b
         label: GPT OSS 120B
