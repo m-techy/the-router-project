@@ -26,6 +26,8 @@ class CapabilitySet(BaseModel):
     vision: bool=False
     audio: bool=False
     embeddings: bool=False
+    transcription: bool=False
+    image_generation: bool=False
     reasoning: bool=False
     coding: bool=True
 
@@ -100,6 +102,14 @@ class ChatCompletionRequest(BaseModel):
     stop:Any|None=None
     user:str|None=None
     metadata:dict[str,Any]|None=None
+    model_config={"extra":"allow"}
+
+class EmbeddingRequest(BaseModel):
+    model:str="embed/auto"
+    input:Any
+    encoding_format:Literal["float","base64"]="float"
+    dimensions:int|None=Field(default=None,ge=1,le=3072)
+    user:str|None=None
     model_config={"extra":"allow"}
 
 class Candidate(BaseModel):
