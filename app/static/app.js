@@ -338,6 +338,15 @@
     );
   }
 
+  function modelKind(model) {
+    const caps = model.capabilities || {};
+    if (caps.transcription) return "asr";
+    if (caps.embeddings) return caps.vision || caps.audio ? "embed+" : "embed";
+    if (caps.image_generation) return "image";
+    if (caps.vision) return "vision";
+    return "chat";
+  }
+
   function renderProviders() {
     const query = ($("#providerSearch")?.value || "").toLowerCase();
     const tier = $("#tierFilter")?.value || "all";
@@ -368,7 +377,7 @@
                 <small>${esc(provider.id)} · ${esc(provider.tier)}</small>
               </div>
               <div class="provider-row-models">
-                ${models.map((model) => `<span>${esc(model.label || model.id)}</span>`).join("")}
+                ${models.map((model) => `<span>${esc(model.label || model.id)} <i>${esc(modelKind(model))}</i></span>`).join("")}
                 ${provider.models?.length > 4 ? `<small>+${provider.models.length - 4}</small>` : ""}
               </div>
               <div class="provider-row-health">
