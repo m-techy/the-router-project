@@ -165,6 +165,14 @@ class QuotaManager:
         if changed:
             self.store.upsert_runtime(provider_id, provider_quota_json=state.provider_quota)
 
+    def merge_provider_telemetry(self, provider_id: str, values: dict[str, Any]) -> None:
+        state = self._ensure_loaded(provider_id)
+        state.provider_quota.update(values)
+        self.store.upsert_runtime(
+            provider_id,
+            provider_quota_json=state.provider_quota,
+        )
+
     def record_success(
         self,
         provider_id: str,
