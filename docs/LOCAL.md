@@ -136,6 +136,8 @@ free/auto
 
 Run a short prompt, then open **Usage & traces** to see which provider/model handled it and whether fallback occurred.
 
+Open **Doctor** whenever you want a no-inference readiness check. It reports provider capacity, fallback redundancy, credential-storage safety, registry freshness, default-route availability, project isolation, and custom-route state.
+
 ## Python project example
 
 ```bash
@@ -195,6 +197,65 @@ console.log(response.choices[0].message.content);
 - `trial/auto` — explicitly allow trial/expiring providers
 
 The `free/*` routes do not silently use trial/promotional pools.
+
+### Custom route profiles
+
+Open **Routes** to create stable aliases such as:
+
+```text
+route/my-app
+```
+
+A custom route can:
+
+- choose a base strategy such as `free/fast` or `free/code`
+- allow or deny specific providers
+- require a minimum context window
+- cap the number of fallback attempts
+- explicitly opt into promotional or trial pools
+
+The profile is stored in normal Router settings, appears in `GET /v1/models`, and works from the Playground and OpenAI-compatible clients.
+
+## Responses compatibility
+
+The Router exposes a stateless Responses-compatible endpoint:
+
+```text
+POST /v1/responses
+```
+
+Python:
+
+```python
+response = client.responses.create(
+    model="free/auto",
+    instructions="Be concise.",
+    input="Explain embeddings in two sentences.",
+)
+print(response.output_text)
+```
+
+Supported compatibility includes text/message input, function tools, function-call history, JSON response formats, and text streaming.
+
+The Router deliberately rejects features that require server-side OpenAI conversation/job state: `previous_response_id`, Conversations, background Responses jobs, and `store=true`. Streaming Responses with function-tool deltas is not exposed yet.
+
+## Image generation
+
+The local API also exposes:
+
+```text
+POST /v1/images/generations
+```
+
+Image aliases:
+
+- `image/auto` — balanced image route
+- `image/fast` — prefer speed where multiple reviewed image models exist
+- `image/quality` — prefer quality
+
+The initial reviewed pool uses Cloudflare Workers AI FLUX.1 Schnell and returns base64 JPEG data. The Router tracks a conservative local neuron reservation against Cloudflare's daily free allocation.
+
+Current FLUX compatibility intentionally rejects unsupported size control, transparent backgrounds, URL result hosting, and `n > 1`.
 
 ## Embeddings and transcription
 
@@ -264,6 +325,14 @@ To require a valid project key on routed API calls:
 ```text
 ROUTER_REQUIRE_PROJECT_KEYS=true
 ```
+
+When a project key is created from the dashboard, that key is attached to the current browser tab's Playground and generated snippets. It stays in session storage only. Revoking the matching project clears it from that tab.
+
+## Optional admin key for shared/self-hosted installs
+
+If you set `ROUTER_ADMIN_KEY`, protected control-plane actions require that key.
+
+Use the **Admin** button in the dashboard header to unlock those controls for the current tab. The key is held in browser session storage, not local storage.
 
 ## Live usage events
 
