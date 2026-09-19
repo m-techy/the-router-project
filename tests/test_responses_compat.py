@@ -67,6 +67,32 @@ def test_responses_rejects_stateful_and_unsupported_builtin_tools():
         )
 
 
+def test_responses_function_call_history_maps_to_assistant_and_tool_messages():
+    request = ResponseCreateRequest(
+        input=[
+            {
+                "type": "function_call",
+                "call_id": "call_123",
+                "name": "weather",
+                "arguments": '{"city":"Hyderabad"}',
+            },
+            {
+                "type": "function_call_output",
+                "call_id": "call_123",
+                "output": '{"temp":30}',
+            },
+        ],
+    )
+
+    chat = response_request_to_chat(request)
+
+    assert chat.messages[0].role == "assistant"
+    assert chat.messages[0].tool_calls[0]["id"] == "call_123"
+    assert chat.messages[0].tool_calls[0]["function"]["name"] == "weather"
+    assert chat.messages[1].role == "tool"
+    assert chat.messages[1].tool_call_id == "call_123"
+
+
 def test_chat_body_converts_to_response_object():
     request = ResponseCreateRequest(input="hello")
     body = {
