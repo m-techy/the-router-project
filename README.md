@@ -31,6 +31,22 @@ The Router is a personal-first AI gateway for hobby projects, prototypes, agents
 
 The lightweight native launcher is the default for personal use. Docker is optional.
 
+### One-command install
+
+macOS / Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/m-techy/the-router-project/main/install.sh | bash
+```
+
+Windows PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/m-techy/the-router-project/main/install.ps1 | iex
+```
+
+The installer clones or fast-forward updates `~/.the-router` / `$HOME\.the-router`, verifies Python 3.11+, then launches the normal lightweight native runner. Set `ROUTER_INSTALL_NO_START=1` if you only want to install/update without starting.
+
 ### Method 1 — native Python (recommended)
 
 Windows:
@@ -88,7 +104,7 @@ The web console contains:
 - **Usage & traces** — persistent request history and fallback chains.
 - **Catalog review** — inspect upstream free-model additions/removals before promotion.
 
-Provider credentials saved through Setup stay in the local SQLite data store. The local store is not encrypted at rest yet; environment variables still take precedence and are preferred for shared/remote deployments.
+Provider credentials saved through Setup stay in the local SQLite data store. Set `ROUTER_VAULT_KEY` to encrypt locally stored values at rest; environment variables still take precedence and remain a good choice for managed deployments.
 
 OpenAI base URL:
 
@@ -148,7 +164,7 @@ print(transcript.text)
 
 The browser UI is the primary control plane, not an optional demo. It provides first-run provider setup, generated SDK snippets, an in-app usage guide, quota/health visibility, certification probes, model inventory, route previews, an interactive playground, persistent request traces, and a review queue for upstream model changes.
 
-Provider credential values are never returned to the browser after they are saved. Locally saved credentials live in the SQLite-backed router data volume and are **not encrypted at rest yet**; use environment variables for shared or remote deployments.
+Provider credential values are never returned to the browser after they are saved. Locally saved credentials can be Fernet-encrypted at rest by setting `ROUTER_VAULT_KEY`; without that option they remain compatible plaintext local storage.
 
 ## v0.5 local platform controls
 
@@ -165,6 +181,22 @@ The **Projects** dashboard view can issue local `rtr_...` API keys with independ
 The dashboard also consumes `GET /api/events`, a resumable local SSE stream over the persistent usage ledger.
 
 Config export/import deliberately excludes secret values. Export files contain normal router settings plus the names of configured credential keys, never the credentials themselves.
+
+## v0.6 distribution & ecosystem
+
+The Router now exposes a stable provider adapter SDK v1 through `app.providers.sdk`. Custom adapters can be registered at runtime with `router.register_adapter(...)`, and `GET /api/adapters` reports the active adapter SDK/capability inventory.
+
+Provider contributions are gated by `python scripts/validate_registry.py`, the provider verification issue form, and the pull-request checklist in `CONTRIBUTING.md`.
+
+Registry releases are built as deterministic `provider-registry.zip` bundles containing canonical JSON, a manifest, and SHA-256 checksums. Release workflows generate GitHub/Sigstore provenance attestations. After downloading a bundle:
+
+```bash
+gh attestation verify provider-registry.zip -R m-techy/the-router-project
+unzip provider-registry.zip
+sha256sum -c providers.sha256
+```
+
+See `docs/REGISTRY_RELEASES.md` for the release/verification model.
 
 ## Vercel
 
@@ -281,6 +313,7 @@ python scripts/fcm_discovery.py
 python scripts/reconcile_fcm.py
 python scripts/discover_models.py
 python scripts/check_upstreams.py
+python scripts/validate_registry.py
 ```
 
 Discovery does not auto-promote an unknown model into `free/auto`.
@@ -307,6 +340,7 @@ uvicorn app.main:app --reload --port 4010
 | `GET /v1/providers` | Provider state/capabilities/quota metadata |
 | `GET /v1/quota` | Current local + provider-reported quota state |
 | `GET /api/setup/status` | Plug-and-play readiness / missing provider keys |
+| `GET /api/adapters` | Adapter SDK version and registered modality capabilities |
 | `GET /api/vault/status` | Local credential-vault status without exposing secrets |
 | `GET/POST /api/projects` | List or create hashed local router project keys |
 | `DELETE /api/projects/{id}` | Revoke a local project key |
