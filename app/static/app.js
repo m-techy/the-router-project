@@ -118,10 +118,10 @@
 
   function stat(label, value, detail = "") {
     return `
-      <div class="stat">
+      <div class="telemetry-cell">
         <span>${esc(label)}</span>
         <strong>${esc(value)}</strong>
-        <div class="sub">${esc(detail)}</div>
+        <small>${esc(detail)}</small>
       </div>
     `;
   }
@@ -218,15 +218,15 @@
     const source = requirement.source || "missing";
     const configured = Boolean(requirement.configured);
     const status = configured
-      ? `<span class="badge good">${esc(source)}</span>`
-      : '<span class="badge warn">missing</span>';
+      ? `<span class="status-word ready">${esc(source)}</span>`
+      : '<span class="status-word missing">missing</span>';
 
     let control = "";
     if (writable && source !== "environment") {
       if (configured) {
         control = `
-          <button type="button" class="ghost setup-remove" data-key="${esc(requirement.key)}">
-            Remove local
+          <button type="button" class="row-action setup-remove" data-key="${esc(requirement.key)}">
+            remove
           </button>
         `;
       } else {
@@ -238,8 +238,8 @@
               placeholder="${esc(requirement.label)}"
               data-setup-input="${esc(requirement.key)}"
             />
-            <button type="button" class="primary setup-save" data-key="${esc(requirement.key)}">
-              Save
+            <button type="button" class="row-action setup-save" data-key="${esc(requirement.key)}">
+              save
             </button>
           </div>
         `;
@@ -247,12 +247,12 @@
     }
 
     return `
-      <div class="setup-requirement">
-        <div>
-          <strong>${esc(requirement.label)}${requirement.optional ? " (optional)" : ""}</strong>
+      <div class="credential-line">
+        <div class="credential-key">
+          <strong>${esc(requirement.label)}${requirement.optional ? " · optional" : ""}</strong>
           <span>${esc(requirement.key)}</span>
         </div>
-        <div class="setup-actions">${status}${control}</div>
+        <div class="credential-control">${status}${control}</div>
       </div>
     `;
   }
@@ -263,26 +263,18 @@
     const readiness = Math.round(((setup.providers_ready || 0) / total) * 100);
 
     $("#setupReadiness").innerHTML = `
-      <div class="readiness">
-        <div class="readiness-number">${readiness}%</div>
-        <div>
-          <strong>${setup.providers_ready || 0} of ${setup.providers_total || 0} providers ready</strong>
-          <div class="sub">
-            ${setup.persistent_ready || 0} persistent-free pools ·
-            ${setup.no_key_ready || 0} no-key/optional-key pools
-          </div>
-        </div>
+      <div class="readiness-dial" style="--readiness:${readiness * 3.6}deg">
+        <div><strong>${readiness}%</strong><span>ready</span></div>
       </div>
-      <div class="readiness-bar"><i style="width:${readiness}%"></i></div>
-      <div class="setup-flags">
-        <span class="badge">transport: ${esc(setup.transport || "direct")}</span>
-        <span class="badge ${setup.promo_enabled ? "warn" : ""}">
-          promos: ${setup.promo_enabled ? "on" : "off"}
-        </span>
-        <span class="badge ${setup.trial_enabled ? "warn" : ""}">
-          trials: ${setup.trial_enabled ? "on" : "off"}
-        </span>
-        <span class="badge">${esc(setup.mode || "local-platform")}</span>
+      <div class="readiness-copy">
+        <strong>${setup.providers_ready || 0} / ${setup.providers_total || 0} providers</strong>
+        <span>${setup.persistent_ready || 0} recurring-free · ${setup.no_key_ready || 0} no-key/optional-key</span>
+        <div class="readiness-flags">
+          <i>${esc(setup.transport || "direct")}</i>
+          <i>promo ${setup.promo_enabled ? "on" : "off"}</i>
+          <i>trial ${setup.trial_enabled ? "on" : "off"}</i>
+          <i>${esc(setup.mode || "local-platform")}</i>
+        </div>
       </div>
     `;
 
@@ -295,24 +287,25 @@
             setupRequirementRow(requirement, Boolean(setup.writable_setup)),
           )
           .join("");
+
         return `
-          <article class="setup-provider">
-            <div class="setup-provider-head">
+          <article class="credential-provider">
+            <div class="credential-provider-main">
+              <span class="provider-index">${esc(provider.id)}</span>
               <div>
                 <strong>${esc(provider.name)}</strong>
-                <span>${esc(provider.tier)}</span>
+                <small>${esc(provider.tier)}${provider.no_key_required ? " · no key required" : ""}</small>
               </div>
-              <div class="badges">
-                <span class="badge ${provider.ready ? "good" : "warn"}">
-                  ${provider.ready ? "ready" : "needs setup"}
-                </span>
-                ${provider.no_key_required ? '<span class="badge">no key required</span>' : ""}
-              </div>
+              <span class="status-word ${provider.ready ? "ready" : "missing"}">
+                ${provider.ready ? "ready" : "setup"}
+              </span>
             </div>
-            ${requirements || '<div class="sub">No credentials required.</div>'}
+            <div class="credential-requirements">
+              ${requirements || '<div class="credential-line"><span class="muted-line">No credentials required.</span></div>'}
+            </div>
             <div class="provider-links">
-              ${provider.signup_url ? `<a href="${esc(provider.signup_url)}" target="_blank" rel="noreferrer">Get key</a>` : ""}
-              ${provider.docs_url ? `<a href="${esc(provider.docs_url)}" target="_blank" rel="noreferrer">Docs</a>` : ""}
+              ${provider.signup_url ? `<a href="${esc(provider.signup_url)}" target="_blank" rel="noreferrer">Get key ↗</a>` : ""}
+              ${provider.docs_url ? `<a href="${esc(provider.docs_url)}" target="_blank" rel="noreferrer">Docs ↗</a>` : ""}
             </div>
           </article>
         `;
@@ -320,12 +313,12 @@
 
     $("#setupMissing").innerHTML =
       rows.join("") ||
-      '<div class="success-box">No provider configuration is required.</div>';
+      '<div class="empty-state">No provider configuration is required.</div>';
 
     if (!setup.writable_setup) {
       $("#setupMissing").insertAdjacentHTML(
         "afterbegin",
-        '<div class="setup-warning">Credential writes are disabled in hosted mode. Configure provider secrets as deployment environment variables.</div>',
+        '<div class="inline-warning">Credential writes are disabled in hosted mode. Use deployment environment variables.</div>',
       );
     }
 
@@ -358,53 +351,39 @@
 
     $("#providerGrid").innerHTML =
       providers
-        .map((provider) => {
+        .map((provider, index) => {
           const certification = provider.certification?.state || "unknown";
-          const certificationClass =
-            certification === "active"
-              ? "good"
-              : certification === "quarantine"
-                ? "bad"
-                : certification === "retry_later"
-                  ? "warn"
-                  : "";
           const telemetry = provider.runtime?.provider_quota || {};
+          const headroom = pct(provider.runtime?.headroom ?? 0);
+          const models = (provider.models || []).slice(0, 4);
 
           return `
-            <article class="provider-card interactive-card">
-              <div class="provider-top">
-                <div>
-                  <h3>${esc(provider.name)}</h3>
-                  <div class="sub">${esc(provider.id)}</div>
+            <article class="provider-row">
+              <div class="provider-row-index">${String(index + 1).padStart(2, "0")}</div>
+              <div class="provider-row-name">
+                <div class="provider-name-line">
+                  <span class="connection-dot ${provider.configured ? "connected" : ""}"></span>
+                  <strong>${esc(provider.name)}</strong>
                 </div>
-                <span class="connection-dot ${provider.configured ? "connected" : ""}" title="${provider.configured ? "Configured" : "Needs key"}"></span>
+                <small>${esc(provider.id)} · ${esc(provider.tier)}</small>
               </div>
-              <div class="badges">
-                <span class="badge ${provider.tier === "persistent_free" ? "good" : "warn"}">${esc(provider.tier)}</span>
-                <span class="badge ${certificationClass}">${esc(certification)}</span>
-                <span class="badge">${pct(provider.runtime?.headroom ?? 0)}% headroom</span>
+              <div class="provider-row-models">
+                ${models.map((model) => `<span>${esc(model.label || model.id)}</span>`).join("")}
+                ${provider.models?.length > 4 ? `<small>+${provider.models.length - 4}</small>` : ""}
               </div>
-              <div class="models">
-                ${(provider.models || [])
-                  .slice(0, 5)
-                  .map(
-                    (model) =>
-                      `<div><span>${esc(model.label || model.id)}</span><small>${model.current === false ? "stale" : "current"}</small></div>`,
-                  )
-                  .join("")}
-                ${provider.models?.length > 5 ? `<div class="sub">+${provider.models.length - 5} more</div>` : ""}
+              <div class="provider-row-health">
+                <span>${esc(certification)}</span>
+                <div class="headroom-track"><i style="width:${headroom}%"></i></div>
+                <small>${headroom}% headroom</small>
               </div>
-              <div class="provider-links">
-                ${provider.signup_url ? `<a href="${esc(provider.signup_url)}" target="_blank" rel="noreferrer">Signup</a>` : ""}
-                ${provider.docs_url ? `<a href="${esc(provider.docs_url)}" target="_blank" rel="noreferrer">Docs</a>` : ""}
+              <div class="provider-row-meta">
+                ${telemetry.credit_limit_remaining !== undefined ? `<span>credit ${esc(telemetry.credit_limit_remaining)}</span>` : ""}
+                ${telemetry.credit_usage_daily !== undefined ? `<span>daily ${esc(telemetry.credit_usage_daily)}</span>` : ""}
+                ${provider.docs_url ? `<a href="${esc(provider.docs_url)}" target="_blank" rel="noreferrer">docs ↗</a>` : ""}
               </div>
-              <div class="provider-telemetry">
-                ${telemetry.credit_limit_remaining !== undefined ? `<span>credit remaining: ${esc(telemetry.credit_limit_remaining)}</span>` : ""}
-                ${telemetry.credit_usage_daily !== undefined ? `<span>daily usage: ${esc(telemetry.credit_usage_daily)}</span>` : ""}
-              </div>
-              <div class="actions">
-                ${provider.id === "openrouter" ? `<button type="button" class="ghost quota-refresh" data-provider="${esc(provider.id)}">Refresh quota</button>` : ""}
-                <button type="button" class="ghost certify" data-provider="${esc(provider.id)}">Probe</button>
+              <div class="provider-row-actions">
+                ${provider.id === "openrouter" ? `<button type="button" class="row-action quota-refresh" data-provider="${esc(provider.id)}">quota</button>` : ""}
+                <button type="button" class="row-action certify" data-provider="${esc(provider.id)}">probe</button>
               </div>
             </article>
           `;
