@@ -595,12 +595,15 @@
                   <span>strategy <b>${esc(route.base_route)}</b></span>
                   <span>fallbacks <b>${esc(route.max_fallbacks)}</b></span>
                   <span>context <b>${route.min_context ? fmt(route.min_context) : "any"}</b></span>
+                  <span>promo <b>${route.allow_promo ? "on" : "off"}</b></span>
+                  <span>trial <b>${route.allow_trial ? "on" : "off"}</b></span>
                 </div>
                 <div class="route-profile-scope">
                   <span>allow: ${esc(allow)}</span>
                   <span>deny: ${esc(deny)}</span>
                 </div>
                 <div class="route-profile-actions">
+                  <button type="button" class="row-action route-edit" data-route="${esc(route.slug)}">edit</button>
                   <button type="button" class="row-action route-copy" data-model="${esc(route.model)}">copy</button>
                   <button type="button" class="row-action route-delete" data-route="${esc(route.slug)}">delete</button>
                 </div>
@@ -912,6 +915,26 @@
       const trace = event.target.closest(".trace-link");
       if (trace) {
         await loadTrace(trace.dataset.request);
+        return;
+      }
+
+      const routeEdit = event.target.closest(".route-edit");
+      if (routeEdit) {
+        const route = (state.routes || []).find(
+          (item) => item.slug === routeEdit.dataset.route,
+        );
+        if (!route) return;
+        $("#routeName").value = route.name || "";
+        $("#routeSlug").value = route.slug || "";
+        $("#routeBase").value = route.base_route || "free/auto";
+        $("#routeAllow").value = (route.providers_allow || []).join(", ");
+        $("#routeDeny").value = (route.providers_deny || []).join(", ");
+        $("#routeContext").value = route.min_context || "";
+        $("#routeFallbacks").value = route.max_fallbacks || 8;
+        $("#routePromo").checked = Boolean(route.allow_promo);
+        $("#routeTrial").checked = Boolean(route.allow_trial);
+        $("#routeName").scrollIntoView({ behavior: "smooth", block: "center" });
+        toast(`Editing ${route.model}`, "neutral");
         return;
       }
 
