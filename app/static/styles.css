@@ -102,6 +102,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 }
 .hero p{font-size:15px;line-height:1.72;color:#aab1bf;max-width:650px;margin:0}
 .hero-actions{display:flex;gap:9px;margin-top:28px}
+.endpoint-inline{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:9px;margin-top:12px;max-width:590px;padding:8px 8px 8px 11px;border:1px solid var(--line);border-radius:11px;background:#0d1014}.endpoint-inline>span{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}.endpoint-inline code{overflow:auto;color:#cfd9fb;font:10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}.endpoint-inline .ghost{padding:6px 9px;font-size:9px}
 .route-visual{position:relative;min-height:360px}
 .route-core{
   position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:145px;height:145px;border-radius:38px;
