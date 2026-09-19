@@ -22,6 +22,7 @@
       <nav class="command-nav" aria-label="Router navigation">
         <button type="button" class="nav active" data-view="overview">Overview</button>
         <button type="button" class="nav" data-view="setup">Setup</button>
+        <button type="button" class="nav" data-view="projects">Projects</button>
         <button type="button" class="nav" data-view="providers">Providers</button>
         <button type="button" class="nav" data-view="playground">Playground</button>
         <button type="button" class="nav" data-view="usage">Usage</button>
@@ -143,12 +144,62 @@
           </div>
         </section>
 
+        <section class="platform-controls">
+          <div>
+            <span>Local platform state</span>
+            <strong id="vaultSummary">Checking credential vault…</strong>
+            <p>Set <code>ROUTER_VAULT_KEY</code> before launch to encrypt locally stored provider credentials. Existing plaintext values migrate when read.</p>
+          </div>
+          <div class="config-transfer">
+            <span>Portable config</span>
+            <p>Export/import router settings. Secret values are deliberately excluded.</p>
+            <div>
+              <button type="button" id="exportConfig" class="secondary-action">Export config</button>
+              <button type="button" id="importConfig" class="secondary-action">Import config</button>
+              <input id="importConfigFile" type="file" accept="application/json,.json" hidden />
+            </div>
+          </div>
+        </section>
+
         <section class="credential-surface">
           <div class="surface-head">
             <div><span>Provider access</span><strong>Credentials & optional no-key pools</strong></div>
-            <small>Local values are not encrypted at rest yet.</small>
+            <small>Environment variables still take precedence over the local credential store.</small>
           </div>
           <div id="setupMissing" class="setup-list"></div>
+        </section>
+      </section>
+
+      <section id="projects" class="view">
+        <section class="projects-intro">
+          <div>
+            <h2>Give each app<br />its own router key.</h2>
+            <p>Project keys are stored as hashes, returned once, and can carry independent daily request and token limits.</p>
+          </div>
+          <div class="project-create">
+            <label>Project name<input id="projectName" placeholder="tech-trend-peek" maxlength="120" /></label>
+            <div class="inline-fields">
+              <label>Requests / day<input id="projectRequestLimit" type="number" min="1" placeholder="optional" /></label>
+              <label>Tokens / day<input id="projectTokenLimit" type="number" min="1" placeholder="optional" /></label>
+            </div>
+            <button type="button" id="createProject" class="primary-action">Create project key</button>
+          </div>
+        </section>
+
+        <section id="newProjectKey" class="new-project-key" hidden>
+          <div>
+            <span>Copy now — this key is shown once</span>
+            <code id="newProjectKeyValue"></code>
+          </div>
+          <button type="button" id="copyProjectKey" class="secondary-action">Copy key</button>
+        </section>
+
+        <section class="project-surface">
+          <div class="surface-head">
+            <div><span>Local clients</span><strong>Projects & daily limits</strong></div>
+            <small id="projectEnforcement">Legacy local access enabled</small>
+          </div>
+          <div id="projectList" class="project-list"></div>
         </section>
       </section>
 
