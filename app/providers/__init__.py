@@ -7,4 +7,19 @@ __all__ = [
     "GeminiHybridAdapter",
     "GeminiNativeAdapter",
     "OpenAICompatibleAdapter",
+    "SDK_VERSION",
+    "AdapterCapabilities",
+    "ProviderAdapter",
+    "ProviderError",
+    "UnsupportedProviderOperation",
+    "validate_adapter",
 ]
+
+from .sdk import (
+    SDK_VERSION,
+    AdapterCapabilities,
+    ProviderAdapter,
+    ProviderError,
+    UnsupportedProviderOperation,
+    validate_adapter,
+)
