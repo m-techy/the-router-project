@@ -7,7 +7,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from .models import Candidate, EmbeddingRequest, ProviderSpec
+from .models import Candidate, EmbeddingRequest, ImageGenerationRequest, ProviderSpec
 from .providers.base import ProviderError
 from .registry import model_is_current
 from .router import FreeRouter
@@ -18,6 +18,7 @@ TRANSCRIPTION_MODELS = {
     "transcribe/fast",
     "transcribe/accurate",
 }
+IMAGE_MODELS = {"image/auto", "image/fast", "image/quality"}
 
 
 def _estimate_input_tokens(value: Any) -> int:
@@ -79,6 +80,15 @@ def normalize_embedding_encoding(
 
 @dataclass
 class RoutedEmbedding:
+    body: dict[str, Any]
+    provider: str
+    model: str
+    fallback_count: int
+    route_reason: str
+
+
+@dataclass
+class RoutedImage:
     body: dict[str, Any]
     provider: str
     model: str
@@ -302,6 +312,143 @@ class ModalityRouter:
 
         raise RuntimeError(
             "All eligible embedding providers failed: " + "; ".join(errors[-8:])
+        )
+
+    def image_candidates(
+        self,
+        request: ImageGenerationRequest,
+        *,
+        allow_trial: bool,
+        allow_promo: bool,
+    ) -> list[Candidate]:
+        candidates: list[Candidate] = []
+
+        for provider in self.registry.allowed_providers(
+            allow_trial=allow_trial,
+            allow_promo=allow_promo,
+        ):
+            if not self.chat_router._provider_has_key(provider):
+                continue
+            if "${CLOUDFLARE_ACCOUNT_ID}" in provider.base_url and not (
+                self.chat_router.adapters["openai_compatible"]._value(
+                    "CLOUDFLARE_ACCOUNT_ID"
+                )
+            ):
+                continue
+            if not self.quota.available(provider):
+                continue
+            if self.chat_router._certification_factor(provider.id) <= 0:
+                continue
+
+            for model in provider.models:
+                if not model.enabled or not model.free or not model_is_current(model):
+                    continue
+                if not model.capabilities.image_generation:
+                    continue
+                if not self.quota.model_available(provider.id, model.id):
+                    continue
+                if (
+                    request.model not in IMAGE_MODELS
+                    and request.model not in {model.id, f"{provider.id}/{model.id}"}
+                ):
+                    continue
+
+                quality = model.quality
+                speed_weight = 0.45 if request.model == "image/fast" else 0.12
+                if request.model == "image/quality":
+                    quality = min(1.0, quality * 1.08)
+                score, reason = self._candidate_score(
+                    provider,
+                    model.id,
+                    quality,
+                    0,
+                    speed_weight=speed_weight,
+                )
+                candidates.append(
+                    Candidate(
+                        provider_id=provider.id,
+                        model_id=model.id,
+                        score=score,
+                        reason=reason,
+                    )
+                )
+
+        return sorted(candidates, key=lambda item: item.score, reverse=True)
+
+    async def image_generation(
+        self,
+        request: ImageGenerationRequest,
+        *,
+        allow_trial: bool,
+        allow_promo: bool,
+    ) -> RoutedImage:
+        candidates = self.image_candidates(
+            request,
+            allow_trial=allow_trial,
+            allow_promo=allow_promo,
+        )
+        if not candidates:
+            raise RuntimeError(
+                "No eligible configured free image-generation provider/model is currently available"
+            )
+
+        request_id = f"image-{uuid.uuid4().hex[:20]}"
+        errors: list[str] = []
+
+        for index, candidate in enumerate(candidates[:8]):
+            provider = self.registry.get(candidate.provider_id)
+            adapter = self._direct_adapter(provider)
+            method = getattr(adapter, "image_generation", None)
+            if method is None:
+                continue
+
+            started = time.perf_counter()
+            try:
+                body, headers = await method(
+                    provider,
+                    candidate.model_id,
+                    request,
+                )
+                latency = (time.perf_counter() - started) * 1000
+                self.quota.reconcile_headers(provider.id, headers)
+                self.quota.record_success(
+                    provider.id,
+                    model_id=candidate.model_id,
+                    request_id=request_id,
+                    latency_ms=latency,
+                    fallback_count=index,
+                )
+                body["router"] = {
+                    "provider": provider.id,
+                    "model": candidate.model_id,
+                    "fallback_count": index,
+                    "route_reason": candidate.reason,
+                    "request_id": request_id,
+                }
+                return RoutedImage(
+                    body=body,
+                    provider=provider.id,
+                    model=candidate.model_id,
+                    fallback_count=index,
+                    route_reason=candidate.reason,
+                )
+            except ProviderError as exc:
+                latency = (time.perf_counter() - started) * 1000
+                self.quota.record_failure(
+                    provider.id,
+                    model_id=candidate.model_id,
+                    request_id=request_id,
+                    status_code=exc.status_code,
+                    latency_ms=latency,
+                    fallback_count=index,
+                    error=str(exc),
+                )
+                errors.append(
+                    f"{provider.id}/{candidate.model_id}: {exc.status_code or 'network'}"
+                )
+
+        raise RuntimeError(
+            "All eligible image-generation providers failed: " + "; ".join(errors[-8:])
         )
 
     def transcription_candidates(
