@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Header, HTTPException, Response
+from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -57,6 +57,75 @@ def require_admin(authorization: str | None) -> None:
         raise HTTPException(status_code=401, detail="Admin authorization required")
 
 
+def public_base_url(request: Request) -> str:
+    override = os.getenv("ROUTER_PUBLIC_URL", "").strip().rstrip("/")
+    return override or str(request.base_url).rstrip("/")
+
+
+def setup_status() -> dict[str, Any]:
+    enabled = [provider for provider in registry.providers if provider.enabled]
+    ready = [provider for provider in enabled if configured(provider)]
+    persistent = [p for p in ready if p.tier.value == "persistent_free"]
+    no_key = [
+        p
+        for p in enabled
+        if p.auth in {"none", "optional_bearer"} or p.env_key is None
+    ]
+    missing = [
+        {
+            "provider": p.id,
+            "name": p.name,
+            "env_key": p.env_key,
+            "tier": p.tier.value,
+            "signup_url": p.signup_url,
+            "docs_url": p.docs_url,
+        }
+        for p in enabled
+        if not configured(p) and p.env_key
+    ]
+    return {
+        "ready": bool(ready),
+        "providers_total": len(enabled),
+        "providers_ready": len(ready),
+        "persistent_ready": len(persistent),
+        "no_key_ready": len([p for p in no_key if configured(p)]),
+        "missing": missing,
+        "recommended_next": missing[:5],
+        "trial_enabled": env_bool("ROUTER_ALLOW_TRIAL"),
+        "promo_enabled": env_bool("ROUTER_ALLOW_PROMO"),
+        "transport": router.transport_mode,
+    }
+
+
+def client_snippets(base_url: str) -> dict[str, str]:
+    api_base = f"{base_url}/v1"
+    return {
+        "python": (
+            "from openai import OpenAI\n\n"
+            f'client = OpenAI(base_url="{api_base}", api_key="local")\n'
+            'r = client.chat.completions.create(\n'
+            '    model="free/auto",\n'
+            '    messages=[{"role": "user", "content": "Hello"}],\n'
+            ')\n'
+            "print(r.choices[0].message.content)"
+        ),
+        "javascript": (
+            'import OpenAI from "openai";\n\n'
+            f'const client = new OpenAI({{ baseURL: "{api_base}", apiKey: "local" }});\n'
+            "const r = await client.chat.completions.create({\n"
+            '  model: "free/auto",\n'
+            '  messages: [{ role: "user", content: "Hello" }],\n'
+            "});\n"
+            "console.log(r.choices[0].message.content);"
+        ),
+        "curl": (
+            f"curl {api_base}/chat/completions \\\n"
+            '  -H "Content-Type: application/json" \\\n'
+            '  -d \'{"model":"free/auto","messages":[{"role":"user","content":"Hello"}]}\''
+        ),
+    }
+
+
 async def periodic_probe() -> None:
     minutes = int(os.getenv("ROUTER_PROBE_INTERVAL_MINUTES", "0"))
     if minutes <= 0:
@@ -85,7 +154,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(
     title="The Router",
     description="Free-tier-aware multi-provider AI router",
-    version="0.2.0",
+    version="0.3.0",
     lifespan=lifespan,
 )
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -106,6 +175,20 @@ async def health() -> dict[str, Any]:
         "registry_updated_at": registry.data.updated_at,
         "db": str(DB_PATH),
         "transport": router.transport_mode,
+    }
+
+
+@app.get("/api/setup/status")
+async def setup_status_endpoint() -> dict[str, Any]:
+    return setup_status()
+
+
+@app.get("/api/setup/snippets")
+async def setup_snippets(request: Request) -> dict[str, Any]:
+    return {
+        "base_url": f"{public_base_url(request)}/v1",
+        "snippets": client_snippets(public_base_url(request)),
+        "virtual_models": sorted(VIRTUAL_MODELS),
     }
 
 
@@ -182,6 +265,14 @@ async def usage_recent(limit: int = 50) -> dict[str, Any]:
     return {"events": store.recent_usage(min(max(limit, 1), 500))}
 
 
+@app.get("/api/usage/trace/{request_id}")
+async def usage_trace(request_id: str) -> dict[str, Any]:
+    events = store.request_trace(request_id)
+    if not events:
+        raise HTTPException(status_code=404, detail="Unknown request id")
+    return {"request_id": request_id, "events": events}
+
+
 @app.post("/api/route/preview")
 async def route_preview(request: ChatCompletionRequest) -> dict[str, Any]:
     allow_trial, allow_promo = route_flags(request.model)
@@ -215,7 +306,7 @@ async def certify_all(
     require_admin(authorization)
     results = []
     for provider in registry.providers:
-        if provider.enabled:
+        if provider.enabled and configured(provider):
             results.append(await certify_provider(router, provider))
     return {"results": results}
 
