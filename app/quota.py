@@ -35,6 +35,27 @@ class QuotaManager:
         now = dt.datetime.now(dt.timezone.utc)
         return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).timestamp()
 
+    def _utc_day_key(self) -> str:
+        return dt.datetime.now(dt.timezone.utc).date().isoformat()
+
+    def _day_neurons(self, state: RuntimeQuota) -> float:
+        day = self._utc_day_key()
+        if state.provider_quota.get("local_neurons_date") != day:
+            state.provider_quota["local_neurons_date"] = day
+            state.provider_quota["local_neurons_used"] = 0.0
+        return float(state.provider_quota.get("local_neurons_used") or 0.0)
+
+    def record_neurons(self, provider_id: str, neurons: float) -> None:
+        if neurons <= 0:
+            return
+        state = self._ensure_loaded(provider_id)
+        used = self._day_neurons(state) + float(neurons)
+        state.provider_quota["local_neurons_used"] = round(used, 4)
+        self.store.upsert_runtime(
+            provider_id,
+            provider_quota_json=state.provider_quota,
+        )
+
     def _ensure_loaded(self, provider_id: str) -> RuntimeQuota:
         state = self._state[provider_id]
         if provider_id in self._loaded:
@@ -76,7 +97,12 @@ class QuotaManager:
         while state.month_requests and state.month_requests[0] < month_start:
             state.month_requests.popleft()
 
-    def available(self, provider: ProviderSpec, estimated_tokens: int = 0) -> bool:
+    def available(
+        self,
+        provider: ProviderSpec,
+        estimated_tokens: int = 0,
+        estimated_neurons: float = 0.0,
+    ) -> bool:
         state = self._ensure_loaded(provider.id)
         self._prune(state)
         if time.time() < state.blocked_until:
@@ -92,6 +118,11 @@ class QuotaManager:
             return False
         if q.monthly_tokens is not None and state.month_tokens + estimated_tokens > q.monthly_tokens:
             return False
+        if (
+            q.neurons_per_day is not None
+            and self._day_neurons(state) + estimated_neurons > q.neurons_per_day
+        ):
+            return False
         remaining = state.provider_quota.get("requests_remaining")
         if remaining is not None and remaining <= 0:
             return False
@@ -100,7 +131,12 @@ class QuotaManager:
             return False
         return True
 
-    def headroom(self, provider: ProviderSpec, estimated_tokens: int = 0) -> float:
+    def headroom(
+        self,
+        provider: ProviderSpec,
+        estimated_tokens: int = 0,
+        estimated_neurons: float = 0.0,
+    ) -> float:
         state = self._ensure_loaded(provider.id)
         self._prune(state)
         ratios: list[float] = []
@@ -115,6 +151,15 @@ class QuotaManager:
             ratios.append(max(0.0, 1 - len(state.month_requests) / q.monthly_requests))
         if q.monthly_tokens:
             ratios.append(max(0.0, 1 - (state.month_tokens + estimated_tokens) / q.monthly_tokens))
+        if q.neurons_per_day:
+            ratios.append(
+                max(
+                    0.0,
+                    1
+                    - (self._day_neurons(state) + estimated_neurons)
+                    / q.neurons_per_day,
+                )
+            )
 
         limit = state.provider_quota.get("requests_limit")
         remaining = state.provider_quota.get("requests_remaining")
@@ -367,6 +412,7 @@ class QuotaManager:
             "minute_requests": len(state.minute_requests),
             "day_requests": len(state.day_requests),
             "day_tokens": state.day_tokens,
+            "day_neurons": round(self._day_neurons(state), 4),
             "monthly_requests": len(state.month_requests),
             "monthly_tokens": state.month_tokens,
             "blocked_until": state.blocked_until,
