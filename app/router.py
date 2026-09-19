@@ -142,6 +142,8 @@ class FreeRouter:
             for model in provider.models:
                 if not model.enabled or not model.free:
                     continue
+                if not self.quota.model_available(provider.id, model.id):
+                    continue
                 if requested not in VIRTUAL_MODELS and requested not in {model.id, f"{provider.id}/{model.id}"}:
                     continue
 
@@ -152,7 +154,9 @@ class FreeRouter:
                     continue
 
                 quota_score = self.quota.headroom(provider, estimated)
-                health_score = self.quota.health(provider.id)
+                provider_health = self.quota.health(provider.id)
+                model_health = self.quota.model_health(provider.id, model.id)
+                health_score = min(provider_health, model_health)
                 quality_score = model.quality
                 latency = self.quota.snapshot(provider).get("latency_ema_ms")
                 speed_score = 0.85 if latency is None else max(0.35, min(1.0, 1500 / max(150, latency)))
@@ -182,7 +186,7 @@ class FreeRouter:
                         score=score,
                         reason=(
                             f"quality={quality_score:.2f},quota={quota_score:.2f},"
-                            f"health={health_score:.2f},speed={speed_score:.2f}"
+                            f"health={health_score:.2f},model_health={model_health:.2f},speed={speed_score:.2f}"
                         ),
                     )
                 )
