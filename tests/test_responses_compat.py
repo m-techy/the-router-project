@@ -93,6 +93,27 @@ def test_responses_function_call_history_maps_to_assistant_and_tool_messages():
     assert chat.messages[1].tool_call_id == "call_123"
 
 
+def test_responses_rejects_store_and_file_id_images():
+    with pytest.raises(ValueError, match="store=true"):
+        response_request_to_chat(
+            ResponseCreateRequest(input="hello", store=True)
+        )
+
+    with pytest.raises(ValueError, match="file_id"):
+        response_request_to_chat(
+            ResponseCreateRequest(
+                input=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "input_image", "file_id": "file_123"}
+                        ],
+                    }
+                ]
+            )
+        )
+
+
 def test_chat_body_converts_to_response_object():
     request = ResponseCreateRequest(input="hello")
     body = {
