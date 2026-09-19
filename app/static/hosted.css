@@ -103,7 +103,7 @@ button{font:inherit;cursor:pointer}
   width:min(1180px,calc(100% - 40px));margin:0 auto;padding-bottom:210px;
   display:grid;grid-template-columns:.72fr 1.28fr;gap:75px;align-items:start
 }
-.pinned-copy{position:sticky;top:130px}.pinned-copy h2{margin:0;font-size:clamp(2.7rem,4.8vw,5rem);line-height:.97;letter-spacing:-.05em;font-weight:600}.pinned-copy p{max-width:480px;color:var(--muted);font-size:12px;line-height:1.7;margin:19px 0 0}
+.pinned-copy{position:relative}.pinned-copy h2{margin:0;font-size:clamp(2.7rem,4.8vw,5rem);line-height:.97;letter-spacing:-.05em;font-weight:600}.pinned-copy p{max-width:480px;color:var(--muted);font-size:12px;line-height:1.7;margin:19px 0 0}
 .stacking-stories{position:relative;padding-bottom:120px}.stack-card{
   position:sticky;top:115px;min-height:570px;margin-bottom:34px;border:1px solid var(--line);background:#0b0e11;overflow:hidden;box-shadow:0 32px 90px rgba(0,0,0,.34)
 }
