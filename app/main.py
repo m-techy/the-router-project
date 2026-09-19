@@ -396,6 +396,7 @@ async def import_config(
 async def live_events(
     request: Request,
     after_id: int = 0,
+    last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
 ):
     if IS_VERCEL:
         raise HTTPException(
@@ -404,7 +405,13 @@ async def live_events(
         )
 
     async def event_stream():
-        cursor = max(0, after_id)
+        resume_id = 0
+        if last_event_id:
+            try:
+                resume_id = int(last_event_id)
+            except ValueError:
+                resume_id = 0
+        cursor = max(0, after_id, resume_id)
         idle_ticks = 0
         while not await request.is_disconnected():
             rows = store.usage_after_id(cursor, limit=100)
