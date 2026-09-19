@@ -83,6 +83,18 @@
     return window.sessionStorage.getItem("routerAdminKey") || "";
   }
 
+  function projectKey() {
+    return window.sessionStorage.getItem("routerProjectKey") || "";
+  }
+
+  function inferenceHeaders(headers = {}) {
+    const key = projectKey();
+    return {
+      ...headers,
+      ...(key ? { Authorization: `Bearer ${key}` } : {}),
+    };
+  }
+
   function authHeaders(headers = {}) {
     const key = adminKey();
     return {
@@ -362,9 +374,24 @@
   }
 
   function renderSnippet() {
-    const code =
+    let code =
       state.snippets?.snippets?.[state.activeSnippet] ||
       "Start the local router to generate a client snippet.";
+    const key = projectKey();
+    if (key) {
+      code = code
+        .replace('api_key="local"', `api_key="${key}"`)
+        .replace('apiKey: "local"', `apiKey: "${key}"`);
+      if (
+        state.activeSnippet === "curl"
+        && !code.includes("Authorization: Bearer")
+      ) {
+        code = code.replace(
+          '-H "Content-Type: application/json"',
+          `-H "Content-Type: application/json" \\\n  -H "Authorization: Bearer ${key}"`,
+        );
+      }
+    }
     $("#snippetCode").textContent = code;
     $$(".snippet-tab").forEach((button) =>
       button.classList.toggle(
@@ -534,7 +561,7 @@
                     ${project.enabled ? "active" : "disabled"}
                   </span>
                 </div>
-                <button type="button" class="row-action project-delete" data-project="${esc(project.id)}">
+                <button type="button" class="row-action project-delete" data-project="${esc(project.id)}" data-prefix="${esc(project.key_prefix)}">
                   revoke
                 </button>
               </article>
@@ -918,6 +945,9 @@
           await api(`/api/projects/${encodeURIComponent(projectDelete.dataset.project)}`, {
             method: "DELETE",
           });
+          if (projectKey().startsWith(projectDelete.dataset.prefix || "__never__")) {
+            window.sessionStorage.removeItem("routerProjectKey");
+          }
           toast("Project key revoked", "good");
           await refresh();
         } catch (error) {
@@ -1050,12 +1080,13 @@
           }),
         });
         state.newProjectKey = created.key;
+        window.sessionStorage.setItem("routerProjectKey", created.key);
         $("#newProjectKeyValue").textContent = created.key;
         $("#newProjectKey").hidden = false;
         $("#projectName").value = "";
         $("#projectRequestLimit").value = "";
         $("#projectTokenLimit").value = "";
-        toast("Project key created — copy it now", "good");
+        toast("Project key created and attached to this tab — copy it now", "good");
         await refresh();
       } catch (error) {
         toast(error.message || "Could not create project", "bad");
@@ -1147,7 +1178,7 @@
       try {
         const response = await fetch("/v1/chat/completions", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: inferenceHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(playgroundRequest()),
         });
         const data = await response.json();
