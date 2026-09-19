@@ -33,8 +33,9 @@
       <div class="hero-copy">
         <h1>One control layer for every free AI pool you trust.</h1>
         <p>
-          Keep your apps on one OpenAI-compatible endpoint while The Router watches
-          capability, quota, health, latency, and fallback across providers.
+          Keep chat, Responses, embeddings, transcription, and image generation
+          behind one control layer while The Router watches capability, quota,
+          health, latency, policy, and fallback across providers.
         </p>
         <div class="hero-actions">
           <a class="primary-cta" href="#run">Run local first</a>
@@ -107,8 +108,8 @@
 
         <article class="bento local-card">
           <div>
-            <span>Local-first · hosted by deliberate opt-in</span>
-            <h3>SQLite stays the default. Durable PostgreSQL can power an authenticated hosted router when every security gate passes.</h3>
+            <span>Local-first · policy-aware</span>
+            <h3>SQLite stays the default. Custom route profiles, System Doctor, project keys, and stream-aware quota accounting all work locally before any hosted setup exists.</h3>
           </div>
           <code>GET /api/hosted/readiness</code>
         </article>
@@ -222,9 +223,9 @@
         <h2>Start local.<br />Host only when deliberate.</h2>
         <p>
           Native mode remains the everyday personal setup. Docker adds isolation.
-          v0.7 adds a PostgreSQL state backend for authenticated serverless hosting,
-          but hosted inference stays fail-closed until durable state, encryption,
-          admin auth, and project-key enforcement are all configured.
+          v0.8 adds custom route profiles, System Doctor, stateless Responses
+          compatibility, image generation, and stream token accounting. PostgreSQL
+          hosting remains optional and fail-closed until you deliberately configure it.
         </p>
 
         <div class="run-tabs">
@@ -266,7 +267,7 @@ response = client.chat.completions.create(
     </section>
 
     <section class="final-action">
-      <h2>Keep the client simple.<br />Make the control layer smarter.</h2>
+      <h2>Keep the client simple.<br />Let policy, quota, and fallback live here.</h2>
       <div>
         <a class="primary-cta" href="https://github.com/m-techy/the-router-project" target="_blank" rel="noreferrer">Clone The Router</a>
         <a class="footer-link" href="#run">Local run guide ↓</a>
