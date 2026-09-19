@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import datetime as dt
 import json
 import sqlite3
 import threading
 import time
 from pathlib import Path
 from typing import Any
+
+from .vault import SecretVault
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS usage_events (
@@ -45,6 +48,28 @@ CREATE TABLE IF NOT EXISTS settings (
 CREATE TABLE IF NOT EXISTS local_secrets (
  key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at REAL NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS project_keys (
+ id TEXT PRIMARY KEY,
+ name TEXT NOT NULL,
+ key_hash TEXT UNIQUE NOT NULL,
+ key_prefix TEXT NOT NULL,
+ daily_request_limit INTEGER,
+ daily_token_limit INTEGER,
+ enabled INTEGER NOT NULL DEFAULT 1,
+ created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_project_keys_hash ON project_keys(key_hash);
+
+CREATE TABLE IF NOT EXISTS project_usage (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ ts REAL NOT NULL,
+ project_id TEXT NOT NULL,
+ requests INTEGER NOT NULL DEFAULT 1,
+ tokens INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_project_usage_project_ts
+ ON project_usage(project_id, ts);
 """
 
 
@@ -55,6 +80,7 @@ class StateStore:
         self._lock = threading.RLock()
         self._conn = sqlite3.connect(self.path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+        self._vault = SecretVault.from_env()
         with self._conn:
             self._conn.executescript(SCHEMA)
 
@@ -92,6 +118,14 @@ class StateStore:
                 (limit,),
             ).fetchall()
         return [dict(r) for r in rows]
+
+    def usage_after_id(self, last_id: int, limit: int = 100) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM usage_events WHERE id>? ORDER BY id LIMIT ?",
+                (last_id, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def usage_since(self, provider_id: str, since: float) -> list[dict[str, Any]]:
         with self._lock:
@@ -275,6 +309,20 @@ class StateStore:
                 (key, encoded, time.time()),
             )
 
+    def all_settings(self) -> dict[str, Any]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT key,value FROM settings ORDER BY key"
+            ).fetchall()
+        result: dict[str, Any] = {}
+        for row in rows:
+            raw = row["value"]
+            try:
+                result[str(row["key"])] = json.loads(raw)
+            except (TypeError, json.JSONDecodeError):
+                result[str(row["key"])] = raw
+        return result
+
     def delete_setting(self, key: str) -> None:
         with self._lock, self._conn:
             self._conn.execute("DELETE FROM settings WHERE key=?", (key,))
@@ -285,9 +333,20 @@ class StateStore:
                 "SELECT value FROM local_secrets WHERE key=?",
                 (key,),
             ).fetchone()
-        return str(row["value"]) if row else None
+        if not row:
+            return None
+
+        stored = str(row["value"])
+        decoded = self._vault.decrypt(stored)
+        if decoded is None:
+            return None
+
+        if self._vault.enabled and not self._vault.is_encrypted(stored):
+            self.set_secret(key, decoded)
+        return decoded
 
     def set_secret(self, key: str, value: str) -> None:
+        stored = self._vault.encrypt(value)
         with self._lock, self._conn:
             self._conn.execute(
                 """
@@ -296,7 +355,7 @@ class StateStore:
                   value=excluded.value,
                   updated_at=excluded.updated_at
                 """,
-                (key, value, time.time()),
+                (key, stored, time.time()),
             )
 
     def delete_secret(self, key: str) -> None:
@@ -309,3 +368,115 @@ class StateStore:
                 "SELECT key FROM local_secrets ORDER BY key"
             ).fetchall()
         return [str(r["key"]) for r in rows]
+
+    def vault_status(self) -> dict[str, Any]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT value FROM local_secrets"
+            ).fetchall()
+        encrypted = sum(
+            1 for row in rows if self._vault.is_encrypted(str(row["value"]))
+        )
+        return {
+            "enabled": self._vault.enabled,
+            "stored_secrets": len(rows),
+            "encrypted_secrets": encrypted,
+        }
+
+    def create_project(
+        self,
+        project_id: str,
+        *,
+        name: str,
+        key_hash: str,
+        key_prefix: str,
+        daily_request_limit: int | None,
+        daily_token_limit: int | None,
+    ) -> None:
+        with self._lock, self._conn:
+            self._conn.execute(
+                """
+                INSERT INTO project_keys(
+                    id,name,key_hash,key_prefix,daily_request_limit,
+                    daily_token_limit,enabled,created_at
+                ) VALUES(?,?,?,?,?,?,1,?)
+                """,
+                (
+                    project_id,
+                    name,
+                    key_hash,
+                    key_prefix,
+                    daily_request_limit,
+                    daily_token_limit,
+                    time.time(),
+                ),
+            )
+
+    def list_projects(self) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT id,name,key_prefix,daily_request_limit,daily_token_limit,
+                       enabled,created_at
+                FROM project_keys
+                ORDER BY created_at DESC
+                """
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_project_by_hash(self, key_hash: str) -> dict[str, Any] | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM project_keys WHERE key_hash=? AND enabled=1",
+                (key_hash,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def delete_project(self, project_id: str) -> bool:
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "DELETE FROM project_keys WHERE id=?",
+                (project_id,),
+            )
+        return cursor.rowcount > 0
+
+    def _utc_day_start(self) -> float:
+        now = dt.datetime.now(dt.timezone.utc)
+        return now.replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        ).timestamp()
+
+    def project_usage_today(self, project_id: str) -> dict[str, int]:
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT COALESCE(SUM(requests),0) requests,
+                       COALESCE(SUM(tokens),0) tokens
+                FROM project_usage
+                WHERE project_id=? AND ts>=?
+                """,
+                (project_id, self._utc_day_start()),
+            ).fetchone()
+        return {
+            "requests": int(row["requests"] or 0),
+            "tokens": int(row["tokens"] or 0),
+        }
+
+    def record_project_usage(
+        self,
+        project_id: str,
+        *,
+        requests: int = 1,
+        tokens: int = 0,
+    ) -> None:
+        with self._lock, self._conn:
+            self._conn.execute(
+                """
+                INSERT INTO project_usage(ts,project_id,requests,tokens)
+                VALUES(?,?,?,?)
+                """,
+                (time.time(), project_id, max(0, requests), max(0, tokens)),
+            )
