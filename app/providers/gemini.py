@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import json
 import os
 import time
@@ -103,6 +102,19 @@ def _tool_config(tool_choice: Any) -> dict[str, Any] | None:
 def build_native_payload(request: ChatCompletionRequest) -> dict[str, Any]:
     contents: list[dict[str, Any]] = []
     system_parts: list[dict[str, Any]] = []
+    tool_call_names: dict[str, str] = {}
+
+    for history_message in request.messages:
+        if not history_message.tool_calls or not isinstance(history_message.tool_calls, list):
+            continue
+        for call in history_message.tool_calls:
+            if not isinstance(call, dict):
+                continue
+            call_id = call.get("id")
+            function = call.get("function") or {}
+            name = function.get("name") if isinstance(function, dict) else None
+            if call_id and name:
+                tool_call_names[str(call_id)] = str(name)
 
     for message in request.messages:
         if message.role in {"system", "developer"}:
@@ -110,7 +122,7 @@ def build_native_payload(request: ChatCompletionRequest) -> dict[str, Any]:
             continue
 
         if message.role == "tool":
-            name = message.name or message.tool_call_id or "tool"
+            name = message.name or tool_call_names.get(message.tool_call_id or "") or "tool"
             response: Any
             if isinstance(message.content, str):
                 try:
