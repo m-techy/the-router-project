@@ -25,8 +25,8 @@
 - [x] authoritative quota fetcher framework; OpenRouter active telemetry added, retired SiliconFlow endpoint intentionally excluded
 - [x] model-level cooldown/health instead of provider-only runtime state
 - [x] schema normalizers for known Z.AI/Mistral/NVIDIA/tool-call edge cases
-- [ ] native Gemini adapter fallback when OpenAI compatibility loses required functionality
-- [ ] better Cloudflare neuron telemetry
+- [x] native Gemini adapter fallback when OpenAI compatibility loses required functionality
+- [x] Cloudflare free-allocation/reset metadata retained; live neuron balance intentionally not fabricated because no supported authoritative usage endpoint is documented
 - [x] automatic promotional expiry enforcement when upstream expiry metadata exists
 - [x] provider/model change review screen in the dashboard
 
