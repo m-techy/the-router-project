@@ -15,14 +15,17 @@ Build a plug-and-play AI router that lets personal/hobby projects consume legiti
 5. **Upstream first.** Before implementing a provider workaround, inspect `config/upstreams.yaml` and the relevant upstream recent changes.
 6. **License boundaries matter.** Bifrost Apache-2.0 and MIT code can be reused with attribution. New-API AGPL code is reference-only unless the whole licensing strategy is intentionally revisited. Do not copy unknown-license code.
 7. **No unverified free claims.** Community catalogs can discover candidates, but recurring-free status must have official/live evidence before enabling a provider in the persistent pool.
-8. **Secrets never enter git.** Keys are environment variables or future encrypted secret-store entries. Logs/dashboard must never display raw provider credentials.
+8. **Secrets never enter git.** Keys may come from environment variables or the local SQLite setup store. The local store is not encrypted at rest yet; logs/dashboard must never display raw provider credentials, and environment variables are preferred for shared/remote deployments.
 9. **Discovery never auto-promotes.** Catalog sync/reconciliation may create reports and candidates, but only a reviewed registry edit can make a model routable.
 
 ## Architecture
 
 - `app/main.py` — FastAPI facade, setup APIs, dashboard APIs, OpenAI endpoint
 - `app/router.py` — candidate filtering, scoring, fallback, route metadata
-- `app/quota.py` — quota estimates, provider-header reconciliation, cooldowns
+- `app/quota.py` — quota estimates, provider-header reconciliation, provider/model cooldowns
+- `app/quota_telemetry.py` — active provider account/quota telemetry where a current official endpoint exists
+- `app/normalization.py` — strict-provider request schema normalization
+- `app/discovery.py` — review-only model/pricing discovery helpers
 - `app/state.py` — SQLite usage ledger, request traces, runtime persistence, settings
 - `app/certification.py` — active / retry_later / configured / quarantine probes
 - `app/fcm_catalog.py` — safe text parser + reconciliation for free-coding-models
