@@ -3,128 +3,202 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0a0b0d" />
   <title>The Router</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
+  <div class="ambient ambient-a"></div>
+  <div class="ambient ambient-b"></div>
+  <div class="grain"></div>
+
   <div class="shell">
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-mark">R</div>
-        <div><strong>The Router</strong><span>Free AI control plane</span></div>
+        <div class="brand-copy">
+          <strong>The Router</strong>
+          <span>free-capacity control plane</span>
+        </div>
       </div>
-      <nav>
-        <button class="nav active" data-view="overview">Overview</button>
-        <button class="nav" data-view="setup">Setup</button>
-        <button class="nav" data-view="guide">Guide</button>
-        <button class="nav" data-view="providers">Providers</button>
-        <button class="nav" data-view="playground">Playground</button>
-        <button class="nav" data-view="usage">Usage & traces</button>
-        <button class="nav" data-view="catalog">Catalog review</button>
+
+      <nav class="side-nav" aria-label="Router navigation">
+        <button type="button" class="nav active" data-view="overview"><span>Overview</span></button>
+        <button type="button" class="nav" data-view="setup"><span>Setup</span></button>
+        <button type="button" class="nav" data-view="guide"><span>Guide</span></button>
+        <button type="button" class="nav" data-view="providers"><span>Providers</span></button>
+        <button type="button" class="nav" data-view="playground"><span>Playground</span></button>
+        <button type="button" class="nav" data-view="usage"><span>Usage & traces</span></button>
+        <button type="button" class="nav" data-view="catalog"><span>Catalog review</span></button>
       </nav>
+
       <div class="sidebar-foot">
-        <span class="dot" id="healthDot"></span>
-        <span id="healthLabel">Checking router…</span>
+        <div class="health-line">
+          <span class="dot" id="healthDot"></span>
+          <span id="healthLabel">Checking router…</span>
+        </div>
+        <span class="sidebar-version">local-first · zero-cost first</span>
       </div>
     </aside>
 
-    <main>
-      <header>
+    <main class="workspace">
+      <header class="workspace-header">
         <div>
           <h1 id="viewTitle">Overview</h1>
-          <p id="viewSubtitle">Persistent free capacity, one API.</p>
+          <p id="viewSubtitle">Free capacity at a glance.</p>
         </div>
-        <button id="refreshBtn" class="ghost">Refresh</button>
+        <div class="header-actions">
+          <span class="status-chip">OpenAI-compatible</span>
+          <button type="button" id="refreshBtn" class="ghost">Refresh</button>
+        </div>
       </header>
 
       <section id="overview" class="view active">
-        <div class="hero">
-          <div>
-            <span class="eyebrow">ZERO-COST FIRST</span>
-            <h2>Route hobby projects across every legitimate free AI pool.</h2>
-            <p>One OpenAI-compatible endpoint. Quota-aware routing, fallbacks, provider health, and a living catalog.</p>
+        <div class="hero dashboard-hero reveal-panel">
+          <div class="hero-copy">
+            <span class="eyebrow">PERSONAL AI INFRASTRUCTURE</span>
+            <h2>One endpoint.<br />Every free pool you trust.</h2>
+            <p>
+              Route hobby projects across recurring-free AI providers with health-aware
+              fallback, quota tracking, and a living model catalog.
+            </p>
+            <div class="hero-actions">
+              <button type="button" class="primary" data-view-jump="playground">Test the router</button>
+              <button type="button" class="ghost" data-view-jump="setup">Connect providers</button>
+            </div>
           </div>
-          <div class="endpoint">
-            <span>OPENAI BASE URL</span>
-            <code id="baseUrl"></code>
-            <button id="copyBase" class="ghost">Copy</button>
+
+          <div class="route-visual" aria-label="Router topology illustration">
+            <div class="route-core">
+              <span>free/auto</span>
+              <strong>Router</strong>
+            </div>
+            <div class="route-node node-a"><i></i><span>Gemini</span></div>
+            <div class="route-node node-b"><i></i><span>Groq</span></div>
+            <div class="route-node node-c"><i></i><span>Cerebras</span></div>
+            <div class="route-node node-d"><i></i><span>Z.AI</span></div>
+            <svg class="route-lines" viewBox="0 0 560 360" role="presentation">
+              <path d="M280 180 C210 120, 155 90, 90 75" />
+              <path d="M280 180 C360 115, 425 85, 485 80" />
+              <path d="M280 180 C205 230, 145 275, 90 290" />
+              <path d="M280 180 C355 235, 420 270, 490 292" />
+            </svg>
           </div>
         </div>
+
         <div class="stats" id="stats"></div>
+
         <div class="grid two">
           <article class="panel">
-            <div class="panel-head"><h3>Free capacity</h3><span>configured providers</span></div>
+            <div class="panel-head">
+              <div><h3>Free capacity</h3><span>configured pools and estimated headroom</span></div>
+              <span class="panel-signal">live</span>
+            </div>
             <div id="capacityList" class="capacity-list"></div>
           </article>
           <article class="panel">
-            <div class="panel-head"><h3>Recent routes</h3><span>latest requests</span></div>
+            <div class="panel-head">
+              <div><h3>Recent routes</h3><span>latest provider decisions</span></div>
+            </div>
             <div id="recentMini" class="table-wrap"></div>
           </article>
         </div>
       </section>
 
       <section id="setup" class="view">
-        <div class="setup-banner">
+        <div class="setup-banner reveal-panel">
           <div>
             <span class="eyebrow">FIRST RUN</span>
-            <h2>Start the router, then configure everything here.</h2>
-            <p>No config file is required. Add provider credentials in this page, test them, and copy the generated client snippet into any hobby project.</p>
+            <h2>Start light. Add capacity when you need it.</h2>
+            <p>
+              Native Python is the lightweight default. Docker remains available when you
+              want isolation or a reproducible deployment.
+            </p>
           </div>
-          <div class="setup-command">
-            <span>RUN</span>
-            <code>docker compose up --build</code>
+          <div class="run-methods">
+            <div class="run-method featured">
+              <span>LIGHTWEIGHT</span>
+              <strong>start.bat / ./start.sh</strong>
+              <small>Python venv · FastAPI · SQLite</small>
+            </div>
+            <div class="run-method">
+              <span>CONTAINER</span>
+              <strong>docker compose up -d --build</strong>
+              <small>isolated · reproducible · optional Bifrost</small>
+            </div>
           </div>
         </div>
+
         <div class="setup-grid">
           <article class="panel">
-            <div class="panel-head"><h3>Readiness</h3><span>first-run status</span></div>
+            <div class="panel-head"><div><h3>Readiness</h3><span>first-run status</span></div></div>
             <div id="setupReadiness"></div>
           </article>
+
           <article class="panel">
-            <div class="panel-head"><h3>Connect your app</h3><span>copy and paste</span></div>
-            <div class="snippet-tabs">
-              <button class="snippet-tab active" data-snippet="python">Python</button>
-              <button class="snippet-tab" data-snippet="javascript">JavaScript</button>
-              <button class="snippet-tab" data-snippet="curl">cURL</button>
+            <div class="panel-head"><div><h3>Connect your app</h3><span>copy a drop-in client config</span></div></div>
+            <div class="snippet-tabs" role="tablist">
+              <button type="button" class="snippet-tab active" data-snippet="python">Python</button>
+              <button type="button" class="snippet-tab" data-snippet="javascript">JavaScript</button>
+              <button type="button" class="snippet-tab" data-snippet="curl">cURL</button>
             </div>
             <pre id="snippetCode" class="code-block"></pre>
-            <button id="copySnippet" class="ghost">Copy snippet</button>
+            <button type="button" id="copySnippet" class="ghost">Copy snippet</button>
           </article>
         </div>
+
         <article class="panel setup-providers">
-          <div class="panel-head"><h3>Increase free capacity</h3><span>environment variables or your local setup store</span></div>
-          <div class="setup-note">Provider credentials saved here stay on this router instance and are never echoed back to the browser. The local store is not encrypted at rest yet; environment variables still take precedence.</div><div id="setupMissing" class="setup-list"></div>
+          <div class="panel-head">
+            <div><h3>Increase free capacity</h3><span>environment variables or this router's local setup store</span></div>
+          </div>
+          <div class="setup-note">
+            Saved credentials stay on this router instance and are never echoed back to the browser.
+            The local SQLite store is not encrypted at rest yet; environment variables still take precedence.
+          </div>
+          <div id="setupMissing" class="setup-list"></div>
         </article>
       </section>
 
       <section id="guide" class="view">
-        <div class="guide-hero">
-          <span class="eyebrow">QUICK GUIDE</span>
-          <h2>From zero to a routed AI call in five steps.</h2>
-          <p>Your project only needs one OpenAI-compatible base URL. Provider selection, quota tracking, model health, and fallback stay behind The Router.</p>
+        <div class="guide-hero reveal-panel">
+          <span class="eyebrow">HOW TO USE IT</span>
+          <h2>From clone to routed request without infrastructure ceremony.</h2>
+          <p>
+            The Router is meant to disappear behind your apps. Configure providers once,
+            then keep using familiar OpenAI SDK calls.
+          </p>
         </div>
+
         <div class="guide-steps">
-          <article class="guide-step"><b>1</b><div><h3>Run it</h3><p>Clone the repository and run <code>docker compose up --build</code>. Open <code>http://localhost:4010</code>.</p></div></article>
-          <article class="guide-step"><b>2</b><div><h3>Add providers</h3><p>Open <strong>Setup</strong>. Paste any API keys you have. More recurring-free providers means more capacity and better fallback coverage.</p></div></article>
-          <article class="guide-step"><b>3</b><div><h3>Test in Playground</h3><p>Use <code>free/auto</code> normally, or select <code>free/fast</code>, <code>free/smart</code>, <code>free/code</code>, <code>free/reasoning</code>, <code>free/vision</code>, or <code>free/long</code>.</p></div></article>
-          <article class="guide-step"><b>4</b><div><h3>Point your app at it</h3><p>Keep the OpenAI SDK and change its base URL to <code>http://localhost:4010/v1</code>. The client API key can be a placeholder such as <code>local</code>.</p></div></article>
-          <article class="guide-step"><b>5</b><div><h3>Watch routing</h3><p>Providers shows supported quota telemetry and model health. Usage & traces shows each fallback attempt. Catalog review shows upstream model changes before they become routable.</p></div></article>
+          <article class="guide-step"><b>1</b><div><h3>Run native or Docker</h3><p>Use <code>start.bat</code> / <code>./start.sh</code> for the lightweight native process, or Docker when you want isolation.</p></div></article>
+          <article class="guide-step"><b>2</b><div><h3>Connect providers</h3><p>Open Setup and add only the keys you have. No-key pools can work immediately.</p></div></article>
+          <article class="guide-step"><b>3</b><div><h3>Test a virtual route</h3><p>Use Playground with <code>free/auto</code>, then inspect why a provider was chosen.</p></div></article>
+          <article class="guide-step"><b>4</b><div><h3>Point your app here</h3><p>Keep the OpenAI SDK and change its base URL to <code>http://localhost:4010/v1</code>.</p></div></article>
+          <article class="guide-step"><b>5</b><div><h3>Watch the fallback chain</h3><p>Usage & traces shows every provider attempt, latency, token count, and failure.</p></div></article>
         </div>
-        <div class="grid two guide-bottom">
-          <article class="panel">
-            <div class="panel-head"><h3>Zero-cost rules</h3><span>default behavior</span></div>
-            <p class="guide-copy"><code>free/*</code> routes only use reviewed persistent-free pools. Trial and promotional providers stay out unless you explicitly call <code>trial/auto</code> or <code>promo/auto</code>.</p>
-          </article>
-          <article class="panel">
-            <div class="panel-head"><h3>Vercel deployment</h3><span>public site mode</span></div>
-            <p class="guide-copy">Vercel serves the public project/docs page by default. The durable router remains self-hosted until a remote state backend replaces local SQLite for hosted mode.</p>
-          </article>
+
+        <div class="route-accordion" aria-label="Virtual route guide">
+          <button type="button" class="route-accordion-item active">
+            <span>free/auto</span><strong>Balanced default</strong><small>quality + headroom + health</small>
+          </button>
+          <button type="button" class="route-accordion-item">
+            <span>free/fast</span><strong>Latency first</strong><small>favor responsive pools</small>
+          </button>
+          <button type="button" class="route-accordion-item">
+            <span>free/smart</span><strong>Quality first</strong><small>favor stronger models</small>
+          </button>
+          <button type="button" class="route-accordion-item">
+            <span>free/code</span><strong>Code aware</strong><small>coding-capable models only</small>
+          </button>
         </div>
       </section>
 
       <section id="providers" class="view">
         <div class="toolbar">
-          <input id="providerSearch" placeholder="Search providers or models"/>
+          <input id="providerSearch" placeholder="Search providers or models" />
           <select id="tierFilter">
             <option value="all">All tiers</option>
             <option value="persistent_free">Persistent free</option>
@@ -138,7 +212,8 @@
       <section id="playground" class="view">
         <div class="playground-layout">
           <article class="panel compose">
-            <div class="panel-head"><h3>Prompt</h3><span>OpenAI-compatible test console</span></div>
+            <div class="panel-head"><div><h3>Prompt</h3><span>OpenAI-compatible test console</span></div></div>
+
             <label>Virtual model
               <select id="playModel">
                 <option>free/auto</option><option>free/fast</option><option>free/smart</option>
@@ -146,20 +221,24 @@
                 <option>free/long</option><option>promo/auto</option><option>trial/auto</option>
               </select>
             </label>
+
             <div class="inline-fields">
-              <label>Temperature<input id="temperature" type="number" min="0" max="2" step="0.1" value="0.4"/></label>
-              <label>Max tokens<input id="maxTokens" type="number" min="1" step="1" value="800"/></label>
+              <label>Temperature<input id="temperature" type="number" min="0" max="2" step="0.1" value="0.4" /></label>
+              <label>Max tokens<input id="maxTokens" type="number" min="1" step="1" value="800" /></label>
             </div>
+
             <label>System message<textarea id="systemPrompt" rows="3" placeholder="Optional system instruction"></textarea></label>
             <label>User message<textarea id="userPrompt" rows="10" placeholder="Ask anything…">Write a short Python function that deduplicates a list while preserving order.</textarea></label>
+
             <div class="actions">
-              <button id="previewRoute" class="ghost">Preview route</button>
-              <button id="sendPrompt" class="primary">Run</button>
+              <button type="button" id="previewRoute" class="ghost">Preview route</button>
+              <button type="button" id="sendPrompt" class="primary">Run request</button>
             </div>
             <div id="routePreview" class="route-preview"></div>
           </article>
+
           <article class="panel output-panel">
-            <div class="panel-head"><h3>Response</h3><span id="routeMeta">No request yet</span></div>
+            <div class="panel-head"><div><h3>Response</h3><span id="routeMeta">No request yet</span></div></div>
             <pre id="playOutput">Ready.</pre>
           </article>
         </div>
@@ -169,11 +248,11 @@
         <div class="stats" id="usageStats"></div>
         <div class="usage-layout">
           <article class="panel">
-            <div class="panel-head"><h3>Usage ledger</h3><span>click a request to inspect its fallback chain</span></div>
+            <div class="panel-head"><div><h3>Usage ledger</h3><span>select a trace to inspect fallback behavior</span></div></div>
             <div id="usageTable" class="table-wrap"></div>
           </article>
           <article class="panel trace-panel">
-            <div class="panel-head"><h3>Request trace</h3><span id="traceId">Select a request</span></div>
+            <div class="panel-head"><div><h3>Request trace</h3><span id="traceId">Select a request</span></div></div>
             <div id="traceDetail" class="trace-empty">Each provider attempt for a request appears here.</div>
           </article>
         </div>
@@ -182,7 +261,7 @@
       <section id="catalog" class="view">
         <div class="stats" id="catalogStats"></div>
         <article class="panel">
-          <div class="panel-head"><h3>Upstream review queue</h3><span>free-coding-models vs reviewed registry</span></div>
+          <div class="panel-head"><div><h3>Upstream review queue</h3><span>free-coding-models vs reviewed registry</span></div></div>
           <div id="catalogStatus" class="sub"></div>
           <div id="catalogChanges" class="catalog-list"></div>
         </article>
@@ -190,6 +269,11 @@
     </main>
   </div>
 
-  <script src="/static/app.js"></script>
+  <div id="toastHost" class="toast-host" aria-live="polite"></div>
+
+  <script src="/static/app.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js" defer></script>
+  <script src="/static/motion.js" defer></script>
 </body>
 </html>
