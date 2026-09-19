@@ -21,6 +21,21 @@ TRANSCRIPTION_MODELS = {
 IMAGE_MODELS = {"image/auto", "image/fast", "image/quality"}
 
 
+def image_steps(request: ImageGenerationRequest) -> int:
+    quality = (request.quality or "auto").lower()
+    if quality in {"high", "hd", "xhigh", "max"}:
+        return 8
+    if quality == "low":
+        return 2
+    return 4
+
+
+def image_neuron_estimate(request: ImageGenerationRequest) -> float:
+    # Cloudflare FLUX Schnell pricing: 4.8 neurons / 512x512 tile
+    # plus 9.6 neurons per diffusion step.
+    return 4.8 + 9.6 * image_steps(request)
+
+
 def _estimate_input_tokens(value: Any) -> int:
     if isinstance(value, str):
         return max(1, len(value) // 4)
@@ -126,8 +141,13 @@ class ModalityRouter:
         estimated_tokens: int,
         *,
         speed_weight: float,
+        estimated_neurons: float = 0.0,
     ) -> tuple[float, str]:
-        quota_score = self.quota.headroom(provider, estimated_tokens)
+        quota_score = self.quota.headroom(
+            provider,
+            estimated_tokens,
+            estimated_neurons=estimated_neurons,
+        )
         provider_health = self.quota.health(provider.id)
         model_health = self.quota.model_health(provider.id, model_id)
         health_score = min(provider_health, model_health)
@@ -335,7 +355,11 @@ class ModalityRouter:
                 )
             ):
                 continue
-            if not self.quota.available(provider):
+            estimated_neurons = image_neuron_estimate(request)
+            if not self.quota.available(
+                provider,
+                estimated_neurons=estimated_neurons,
+            ):
                 continue
             if self.chat_router._certification_factor(provider.id) <= 0:
                 continue
@@ -363,6 +387,7 @@ class ModalityRouter:
                     quality,
                     0,
                     speed_weight=speed_weight,
+                    estimated_neurons=estimated_neurons,
                 )
                 candidates.append(
                     Candidate(
@@ -418,6 +443,11 @@ class ModalityRouter:
                     latency_ms=latency,
                     fallback_count=index,
                 )
+                if provider.quota.neurons_per_day:
+                    self.quota.record_neurons(
+                        provider.id,
+                        image_neuron_estimate(request),
+                    )
                 body["router"] = {
                     "provider": provider.id,
                     "model": candidate.model_id,
