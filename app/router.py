@@ -141,6 +141,7 @@ class FreeRouter:
                     "stream": adapter.supports("stream"),
                     "embeddings": adapter.supports("embeddings"),
                     "transcription": adapter.supports("transcription"),
+                    "image_generation": adapter.supports("image_generation"),
                 },
             }
             for name, adapter in sorted(self.adapters.items())
