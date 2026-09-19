@@ -182,6 +182,91 @@ console.log(response.choices[0].message.content);
 
 The `free/*` routes do not silently use trial/promotional pools.
 
+## Embeddings and transcription
+
+The same local API now exposes modality-aware routes:
+
+```text
+POST /v1/embeddings
+POST /v1/audio/transcriptions
+```
+
+Embedding aliases:
+
+- `embed/auto` — choose the strongest eligible free embedding model
+- `embed/text` — text embeddings
+- `embed/multimodal` — require a multimodal embedding model
+
+Transcription aliases:
+
+- `transcribe/auto` — balanced Whisper route
+- `transcribe/fast` — prioritize observed latency
+- `transcribe/accurate` — prioritize model quality
+
+## Optional encrypted credential vault
+
+By default, locally saved provider credentials remain compatible with earlier Router versions.
+
+To encrypt values stored in SQLite, generate a vault key:
+
+```bash
+python -m app.vault generate-key
+```
+
+Set the returned value as:
+
+```text
+ROUTER_VAULT_KEY=<generated-key>
+```
+
+Restart The Router. Existing plaintext provider credentials are migrated to Fernet ciphertext as they are read.
+
+Keep the vault key outside the SQLite database. If you lose it, encrypted local credentials cannot be recovered. Environment variables are still supported and still take precedence.
+
+## Per-project router keys
+
+Open **Projects** in the dashboard and create a key for each app.
+
+A project can optionally have:
+
+- a daily request limit
+- a daily token limit
+
+The plaintext key is shown once. The database stores only its hash and prefix.
+
+Use the returned key exactly like an OpenAI API key:
+
+```python
+client = OpenAI(
+    base_url="http://localhost:4010/v1",
+    api_key="rtr_...",
+)
+```
+
+Legacy `api_key="local"` access remains enabled by default.
+
+To require a valid project key on routed API calls:
+
+```text
+ROUTER_REQUIRE_PROJECT_KEYS=true
+```
+
+## Live usage events
+
+The local dashboard listens to:
+
+```text
+GET /api/events
+```
+
+This is an SSE stream backed by the persistent usage ledger. Reconnects resume from the last event ID rather than replaying the full history.
+
+## Export and import
+
+Setup can export router configuration as JSON and import it later.
+
+Provider credential **values are never included** in this export. The file contains normal router settings and a list of which credential keys are configured, not the secrets themselves.
+
 ## Update the local install
 
 ```bash
