@@ -20,6 +20,7 @@ The Router is a personal-first AI gateway for hobby projects, prototypes, agents
 - upstream watchlist so we inspect existing fixes before writing our own
 - safe `free-coding-models` catalog reconciliation without executing upstream JavaScript
 - optional Bifrost transport for mature provider normalization while keeping the default install lightweight
+- Gemini hybrid transport: OpenAI compatibility first, native Gemini REST fallback for compatibility gaps
 
 ## One-command start
 
@@ -36,6 +37,15 @@ git clone https://github.com/m-techy/the-router-project.git && cd the-router-pro
 ```
 
 Then open `http://localhost:4010`.
+
+Even easier:
+
+- **Windows:** double-click `start.bat`
+- **macOS/Linux:** run `sh start.sh`
+
+Both launchers build/start the container, wait for the health endpoint, and open the dashboard when possible.
+
+Full local guide: [docs/LOCAL.md](docs/LOCAL.md)
 
 The web console contains:
 
