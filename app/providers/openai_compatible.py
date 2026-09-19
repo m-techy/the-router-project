@@ -7,13 +7,13 @@ from typing import Any, Callable
 
 import httpx
 
-from app.models import ChatCompletionRequest, EmbeddingRequest, ProviderSpec
+from app.models import ChatCompletionRequest, EmbeddingRequest, ImageGenerationRequest, ProviderSpec
 from app.normalization import normalize_request_body
 from app.providers.base import AdapterCapabilities, ProviderAdapter, ProviderError
 
 
 class OpenAICompatibleAdapter(ProviderAdapter):
-    capabilities = AdapterCapabilities(embeddings=True, transcription=True)
+    capabilities = AdapterCapabilities(embeddings=True, transcription=True, image_generation=True)
 
     def __init__(
         self,
@@ -191,6 +191,82 @@ class OpenAICompatibleAdapter(ProviderAdapter):
                 "Provider returned a non-JSON embedding response",
                 response.status_code,
             ) from exc
+
+    async def image_generation(
+        self,
+        provider: ProviderSpec,
+        model: str,
+        request: ImageGenerationRequest,
+    ) -> tuple[dict[str, Any], httpx.Headers]:
+        if provider.id != "cloudflare-ai":
+            raise ProviderError(
+                f"Image generation is not implemented for adapter provider {provider.id}",
+                501,
+            )
+        if request.n != 1:
+            raise ProviderError("Cloudflare FLUX currently supports n=1 through The Router.", 422)
+        if request.response_format == "url":
+            raise ProviderError(
+                "Cloudflare FLUX returns image bytes/base64, not a hosted result URL.",
+                422,
+            )
+        if (
+            provider.env_key
+            and provider.auth == "bearer"
+            and not self._api_key(provider)
+        ):
+            raise ProviderError(f"Missing API key: {provider.env_key}", 401)
+
+        base = self._base_url(provider)
+        if not base.endswith("/ai/v1"):
+            raise ProviderError("Cloudflare Workers AI base URL is not recognized.", 500)
+        endpoint = base[: -len("/ai/v1")] + "/ai/run/" + self._model_id(provider, model)
+
+        steps = 4
+        quality = (request.quality or "auto").lower()
+        if quality in {"high", "hd", "xhigh", "max"}:
+            steps = 8
+        elif quality in {"low"}:
+            steps = 2
+
+        payload: dict[str, Any] = {
+            "prompt": request.prompt,
+            "steps": steps,
+        }
+        if request.seed is not None:
+            payload["seed"] = request.seed
+
+        try:
+            response = await self.client.post(
+                endpoint,
+                headers=self._headers(provider),
+                json=payload,
+            )
+        except httpx.HTTPError as exc:
+            raise ProviderError(str(exc), None) from exc
+
+        if response.status_code >= 400:
+            raise ProviderError(response.text[:1000], response.status_code)
+
+        try:
+            envelope = response.json()
+        except ValueError as exc:
+            raise ProviderError(
+                "Cloudflare image provider returned a non-JSON response",
+                response.status_code,
+            ) from exc
+
+        result = envelope.get("result") if isinstance(envelope, dict) else None
+        image = result.get("image") if isinstance(result, dict) else None
+        if not image:
+            raise ProviderError("Cloudflare image response did not contain image data.", 502)
+
+        return {
+            "created": int(__import__("time").time()),
+            "data": [{"b64_json": image}],
+            "output_format": request.output_format or "jpeg",
+            "quality": request.quality or "auto",
+        }, response.headers
 
     async def transcription(
         self,
