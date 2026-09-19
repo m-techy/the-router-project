@@ -22,28 +22,55 @@ The Router is a personal-first AI gateway for hobby projects, prototypes, agents
 - optional Bifrost transport for mature provider normalization while keeping the default install lightweight
 - Gemini hybrid transport: OpenAI compatibility first, native Gemini REST fallback for compatibility gaps
 
-## One-command start
+## Run locally
 
-After cloning the repository, the platform starts with one command and does **not** require an `.env` file:
+The lightweight native launcher is the default for personal use. Docker is optional.
 
-```bash
-docker compose up --build
+### Method 1 — native Python (recommended)
+
+Windows:
+
+```powershell
+.\start.bat
 ```
 
-Or clone and start in one shell command:
+macOS / Linux:
 
 ```bash
-git clone https://github.com/m-techy/the-router-project.git && cd the-router-project && docker compose up --build
+./start.sh
 ```
 
-Then open `http://localhost:4010`.
+The launcher:
 
-Even easier:
+- checks for Python 3.11+
+- creates `.venv` once
+- installs dependencies only when `pyproject.toml` changes
+- starts FastAPI + SQLite directly
+- opens `http://localhost:4010` when the router becomes healthy
 
-- **Windows:** double-click `start.bat`
-- **macOS/Linux:** run `sh start.sh`
+This is the lightest everyday mode.
 
-Both launchers build/start the container, wait for the health endpoint, and open the dashboard when possible.
+### Method 2 — Docker
+
+Windows:
+
+```powershell
+.\start-docker.bat
+```
+
+macOS / Linux:
+
+```bash
+./start-docker.sh
+```
+
+Or directly:
+
+```bash
+docker compose up -d --build
+```
+
+Docker is useful when you want isolation, a reproducible environment, or optional sidecars such as Bifrost.
 
 Full local guide: [docs/LOCAL.md](docs/LOCAL.md)
 
@@ -56,7 +83,7 @@ The web console contains:
 - **Usage & traces** — persistent request history and fallback chains.
 - **Catalog review** — inspect upstream free-model additions/removals before promotion.
 
-Provider credentials saved through Setup stay in the local Docker volume. The local store is not encrypted at rest yet; environment variables still take precedence and are preferred for shared/remote deployments.
+Provider credentials saved through Setup stay in the local SQLite data store. The local store is not encrypted at rest yet; environment variables still take precedence and are preferred for shared/remote deployments.
 
 OpenAI base URL:
 
