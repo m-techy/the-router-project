@@ -76,9 +76,14 @@ def build() -> dict[str, object]:
             bundle.writestr(info, files[name])
 
     bundle_sha = sha256_bytes(BUNDLE_OUT.read_bytes())
+    try:
+        bundle_display = str(BUNDLE_OUT.relative_to(ROOT))
+    except ValueError:
+        bundle_display = str(BUNDLE_OUT)
+
     result = {
         **manifest,
-        "bundle": str(BUNDLE_OUT.relative_to(ROOT)),
+        "bundle": bundle_display,
         "bundle_sha256": bundle_sha,
     }
     print(json.dumps(result, indent=2))
