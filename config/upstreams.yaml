@@ -22,7 +22,7 @@ upstreams:
   - repo: songquanpeng/one-api
     license: MIT
     role: original-chinese-gateway-reference
-    use: [Zhipu/GLM compatibility, Alibaba/Qwen compatibility, SiliconFlow balance/API fixes, Doubao/Volcengine patterns, Baidu/MiniMax/other China-provider adapters]
+    use: [Zhipu/GLM compatibility, Alibaba/Qwen compatibility, historical SiliconFlow API fixes that must be re-verified, Doubao/Volcengine patterns, Baidu/MiniMax/other China-provider adapters]
   - repo: BerriAI/litellm
     license: "MIT for core; enterprise directory has separate terms"
     role: provider-normalization-and-proxy-reference
