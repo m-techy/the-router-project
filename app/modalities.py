@@ -32,8 +32,10 @@ def image_steps(request: ImageGenerationRequest) -> int:
 
 def image_neuron_estimate(request: ImageGenerationRequest) -> float:
     # Cloudflare FLUX Schnell pricing: 4.8 neurons / 512x512 tile
-    # plus 9.6 neurons per diffusion step.
-    return 4.8 + 9.6 * image_steps(request)
+    # plus 9.6 neurons per diffusion step. The current model schema does not
+    # expose dimensions, so reserve four tiles conservatively to protect the
+    # zero-cost boundary rather than assuming the cheapest one-tile output.
+    return 19.2 + 9.6 * image_steps(request)
 
 
 def _estimate_input_tokens(value: Any) -> int:
