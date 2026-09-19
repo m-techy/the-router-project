@@ -16,6 +16,7 @@ from .providers.base import ProviderAdapter, ProviderError
 from .providers.sdk import validate_adapter
 from .quota import QuotaManager
 from .registry import ProviderRegistry, model_is_current
+from .route_profiles import ROUTE_PROFILE_PREFIX, RouteProfile, load_route_profiles
 
 VIRTUAL_MODELS = {
     "free/auto",
@@ -90,6 +91,32 @@ class FreeRouter:
         }
         self.transport_mode = os.getenv("ROUTER_TRANSPORT", "direct").lower()
 
+    def route_profile(self, model: str) -> RouteProfile | None:
+        if not model.startswith(ROUTE_PROFILE_PREFIX):
+            return None
+        slug = model[len(ROUTE_PROFILE_PREFIX) :]
+        profile = load_route_profiles(self.quota.store).get(slug)
+        return profile if profile and profile.enabled else None
+
+    def route_permissions(self, model: str) -> tuple[bool, bool]:
+        profile = self.route_profile(model)
+        if not profile:
+            return False, False
+        return profile.allow_trial, profile.allow_promo
+
+    def max_attempts(self, model: str) -> int:
+        profile = self.route_profile(model)
+        return profile.max_fallbacks if profile else 8
+
+    def resolved_requirements(self, request: ChatCompletionRequest) -> set[str]:
+        profile = self.route_profile(request.model)
+        effective = (
+            request.model_copy(update={"model": profile.base_route})
+            if profile
+            else request
+        )
+        return request_requirements(effective)
+
     async def close(self) -> None:
         await self.client.aclose()
 
@@ -148,14 +175,25 @@ class FreeRouter:
         allow_promo: bool,
     ) -> list[Candidate]:
         estimated = estimate_tokens(request)
-        requirements = request_requirements(request)
-        requested = request.model
+        profile = self.route_profile(request.model)
+        effective_request = (
+            request.model_copy(update={"model": profile.base_route})
+            if profile
+            else request
+        )
+        requirements = request_requirements(effective_request)
+        requested = effective_request.model
         candidates: list[Candidate] = []
 
         for provider in self.registry.allowed_providers(
             allow_trial=allow_trial,
             allow_promo=allow_promo,
         ):
+            if profile:
+                if profile.providers_allow and provider.id not in profile.providers_allow:
+                    continue
+                if provider.id in profile.providers_deny:
+                    continue
             if not self._provider_has_key(provider):
                 continue
             if "${CLOUDFLARE_ACCOUNT_ID}" in provider.base_url and not (os.getenv("CLOUDFLARE_ACCOUNT_ID") or self.quota.store.get_secret("CLOUDFLARE_ACCOUNT_ID")):
@@ -181,6 +219,8 @@ class FreeRouter:
                 if any(not getattr(caps, required, False) for required in requirements):
                     continue
                 if requested == "free/long" and (model.context or 0) < 200_000:
+                    continue
+                if profile and profile.min_context and (model.context or 0) < profile.min_context:
                     continue
 
                 quota_score = self.quota.headroom(provider, estimated)
@@ -254,7 +294,7 @@ class FreeRouter:
         request_id = f"router-{uuid.uuid4().hex[:20]}"
         errors: list[str] = []
 
-        for index, candidate in enumerate(candidates[:8]):
+        for index, candidate in enumerate(candidates[: self.max_attempts(request.model)]):
             provider = self.registry.get(candidate.provider_id)
             started = time.perf_counter()
             try:
@@ -319,7 +359,7 @@ class FreeRouter:
         request_id = f"router-{uuid.uuid4().hex[:20]}"
         errors: list[str] = []
 
-        for index, candidate in enumerate(candidates[:8]):
+        for index, candidate in enumerate(candidates[: self.max_attempts(request.model)]):
             provider = self.registry.get(candidate.provider_id)
             started = time.perf_counter()
             try:
