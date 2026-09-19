@@ -1,0 +1,54 @@
+name: Registry Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "registry-v*"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build-registry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install registry tooling
+        run: pip install -e .
+
+      - name: Validate reviewed registry
+        run: python scripts/validate_registry.py
+
+      - name: Build deterministic registry bundle
+        run: python scripts/build_registry_release.py
+
+      - name: Attest registry bundle provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/provider-registry.zip
+
+      - name: Upload registry bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: provider-registry
+          path: |
+            dist/provider-registry.zip
+            dist/providers.json
+            dist/providers.sha256
+            dist/manifest.json
+          if-no-files-found: error
+
+      - name: Publish tagged registry release
+        if: startsWith(github.ref, 'refs/tags/registry-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}"             dist/provider-registry.zip             dist/providers.json             dist/providers.sha256             dist/manifest.json             --verify-tag             --title "Provider Registry ${GITHUB_REF_NAME}"             --generate-notes
