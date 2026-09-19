@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>The Router — Free AI control plane</title>
+  <link rel="stylesheet" href="/static/styles.css"/>
+  <style>
+    body{min-height:100vh}.hosted-shell{max-width:1080px;margin:0 auto;padding:70px 24px 80px}
+    .hosted-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:80px}
+    .hosted-brand{display:flex;align-items:center;gap:10px}.hosted-brand strong{font-size:15px}
+    .hosted-hero{max-width:820px}.hosted-hero h1{font-size:58px;line-height:1.02;letter-spacing:-.045em;margin:14px 0 20px}.hosted-hero p{font-size:18px;line-height:1.7;color:var(--muted);max-width:760px}
+    .hosted-actions{display:flex;gap:10px;margin:28px 0 48px;flex-wrap:wrap}.hosted-actions a{text-decoration:none}
+    .hosted-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:30px 0}.hosted-card{border:1px solid var(--line);background:rgba(17,19,26,.94);border-radius:14px;padding:20px}.hosted-card h3{font-size:15px;margin-bottom:8px}.hosted-card p{font-size:12px;line-height:1.6;color:var(--muted);margin:0}
+    .install{border:1px solid var(--line);background:#0b0d13;border-radius:14px;padding:20px;margin-top:26px}.install pre{margin:10px 0 0;white-space:pre-wrap;color:#dce3f5;overflow:auto}
+    .hosted-status{display:inline-flex;align-items:center;gap:7px;font-size:11px;color:var(--muted)}.hosted-status i{width:7px;height:7px;border-radius:50%;background:var(--good)}
+    @media(max-width:760px){.hosted-nav{margin-bottom:52px}.hosted-hero h1{font-size:42px}.hosted-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <main class="hosted-shell">
+    <nav class="hosted-nav">
+      <div class="hosted-brand"><div class="brand-mark">R</div><strong>The Router</strong></div>
+      <div class="hosted-status"><i></i><span id="status">Project site</span></div>
+    </nav>
+    <section class="hosted-hero">
+      <span class="eyebrow">PERSONAL-FIRST · ZERO-COST-FIRST</span>
+      <h1>One API over your free AI capacity.</h1>
+      <p>The Router combines recurring free LLM providers behind one OpenAI-compatible endpoint, then routes by capability, quota headroom, health and latency—without silently spending money.</p>
+      <div class="hosted-actions">
+        <a class="primary" href="https://github.com/m-techy/the-router-project">View on GitHub</a>
+        <a class="ghost" href="https://github.com/m-techy/the-router-project#plug-and-play-start">Self-host locally</a>
+      </div>
+    </section>
+    <section class="hosted-grid">
+      <article class="hosted-card"><h3>Free-first routing</h3><p>Persistent free pools are the default. Trials and temporary promotions require explicit opt-in.</p></article>
+      <article class="hosted-card"><h3>OpenAI compatible</h3><p>Use existing OpenAI SDK clients with virtual models such as free/auto, free/fast and free/code.</p></article>
+      <article class="hosted-card"><h3>Dashboard + playground</h3><p>Self-hosted mode includes provider setup, health probes, quota visibility, route previews, request traces and an interactive playground.</p></article>
+    </section>
+    <section class="install">
+      <span class="eyebrow">RUN LOCALLY</span>
+      <pre>git clone https://github.com/m-techy/the-router-project.git
+cd the-router-project
+cp .env.example .env
+docker compose up --build
+
+# open http://localhost:4010</pre>
+    </section>
+    <p class="sub" style="margin-top:18px">The hosted Vercel deployment is a project site by default. Inference is intentionally disabled unless hosted mode is explicitly configured with provider credentials and durable state.</p>
+  </main>
+  <script>
+    fetch('/health').then(r=>r.json()).then(d=>{
+      document.getElementById('status').textContent='v'+d.version+' · '+(d.mode||'hosted');
+    }).catch(()=>{});
+  </script>
+</body>
+</html>
