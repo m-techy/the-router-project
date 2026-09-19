@@ -83,7 +83,7 @@ class FreeRouter:
         self.quota = quota
         self.client = httpx.AsyncClient(timeout=timeout)
         self.adapters = {
-            "openai_compatible": OpenAICompatibleAdapter(self.client),
+            "openai_compatible": OpenAICompatibleAdapter(self.client, self.quota.store.get_secret),
             "bifrost": BifrostAdapter(self.client),
         }
         self.transport_mode = os.getenv("ROUTER_TRANSPORT", "direct").lower()
@@ -99,7 +99,7 @@ class FreeRouter:
     def _provider_has_key(self, provider: ProviderSpec) -> bool:
         if provider.auth in {"none", "optional_bearer"} or provider.env_key is None:
             return True
-        return bool(os.getenv(provider.env_key))
+        return bool(os.getenv(provider.env_key) or self.quota.store.get_secret(provider.env_key))
 
     def _certification_factor(self, provider_id: str) -> float:
         runtime = self.quota.store.get_runtime(provider_id) or {}
@@ -130,7 +130,7 @@ class FreeRouter:
         ):
             if not self._provider_has_key(provider):
                 continue
-            if "${CLOUDFLARE_ACCOUNT_ID}" in provider.base_url and not os.getenv("CLOUDFLARE_ACCOUNT_ID"):
+            if "${CLOUDFLARE_ACCOUNT_ID}" in provider.base_url and not (os.getenv("CLOUDFLARE_ACCOUNT_ID") or self.quota.store.get_secret("CLOUDFLARE_ACCOUNT_ID")):
                 continue
             if not self.quota.available(provider, estimated):
                 continue
