@@ -1,93 +1,814 @@
-const state={providers:[],usage:[],health:null,setup:null,snippets:null,catalog:null,activeSnippet:'python'};
-const $=s=>document.querySelector(s); const $$=s=>[...document.querySelectorAll(s)];
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmt=n=>new Intl.NumberFormat().format(Number(n||0));
-const pct=v=>Math.max(0,Math.min(100,Math.round(Number(v||0)*100)));
-async function api(path,opts={}){const r=await fetch(path,{headers:{'Content-Type':'application/json',...(opts.headers||{})},...opts});if(!r.ok){let t=await r.text();throw new Error(t||r.statusText)}return r.json()}
-function show(view){$$('.view').forEach(v=>v.classList.toggle('active',v.id===view));$$('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));const labels={overview:['Overview','Persistent free capacity, one API.'],setup:['Setup','Connect providers and configure the router in your browser.'],guide:['Guide','Install, configure, test, and integrate in minutes.'],providers:['Providers','Recurring, promotional, and trial pools.'],playground:['Playground','Test routing without changing your app.'],usage:['Usage & traces','Persistent request ledger and fallback behavior.'],catalog:['Catalog review','Review upstream free-model changes before promotion.']};$('#viewTitle').textContent=labels[view][0];$('#viewSubtitle').textContent=labels[view][1]}
-$$('.nav').forEach(n=>n.onclick=()=>show(n.dataset.view));
-function stat(label,value,detail=''){return `<div class="stat"><span>${esc(label)}</span><strong>${esc(value)}</strong><div class="sub">${esc(detail)}</div></div>`}
-function renderOverview(){const ps=state.providers;const configured=ps.filter(p=>p.configured);const active=configured.filter(p=>p.certification?.state==='active'||p.certification?.state==='unknown');const persistent=configured.filter(p=>p.tier==='persistent_free');const events=state.usage;$('#stats').innerHTML=stat('Configured',configured.length,`${persistent.length} persistent-free`)+stat('Free models',ps.reduce((n,p)=>n+p.models.length,0),'reviewed catalog entries')+stat('Requests / 24h',events.length,`${events.filter(e=>e.success).length} successful`)+stat('Healthy pools',active.length,'available/configured');
-$('#capacityList').innerHTML=(configured.length?configured:ps.slice(0,8)).slice(0,10).map(p=>{const h=p.runtime?.headroom??.65;return `<div class="capacity-row"><span>${esc(p.name)}</span><div class="meter"><i style="width:${pct(h)}%"></i></div><b>${pct(h)}%</b></div>`}).join('')||'<div class="sub">Add provider API keys to unlock more capacity.</div>';$('#recentMini').innerHTML=table(events.slice(0,8),false)}
-function table(events,withTrace=true){if(!events.length)return '<div class="sub">No requests yet.</div>';return `<table><thead><tr><th>Provider</th><th>Model</th><th>Status</th><th>Latency</th>${withTrace?'<th>Trace</th>':''}</tr></thead><tbody>${events.map(e=>`<tr><td>${esc(e.provider_id)}</td><td>${esc(e.model_id)}</td><td class="${e.success?'ok':'err'}">${e.success?'OK':e.status_code||'ERR'}</td><td>${e.latency_ms?Math.round(e.latency_ms)+' ms':'—'}</td>${withTrace?`<td>${e.request_id?`<button class="trace-link" data-request="${esc(e.request_id)}">${esc(e.request_id.slice(-8))}</button>`:'—'}</td>`:''}</tr>`).join('')}</tbody></table>`}
-function setupRequirementRow(provider,req,writable){
-  const source=req.source||'missing';
-  const status=req.configured?'<span class="badge good">'+esc(source)+'</span>':'<span class="badge warn">missing</span>';
-  let control='';
-  if(writable&&source!=='environment'){
-    if(req.configured){
-      control='<button class="ghost setup-remove" data-key="'+esc(req.key)+'">Remove local</button>';
-    }else{
-      control='<div class="setup-input"><input type="'+(req.secret?'password':'text')+'" autocomplete="off" placeholder="'+esc(req.label)+'" data-setup-input="'+esc(req.key)+'"/><button class="primary setup-save" data-key="'+esc(req.key)+'">Save</button></div>';
+(() => {
+  "use strict";
+
+  const state = {
+    providers: [],
+    usage: [],
+    health: null,
+    setup: null,
+    snippets: null,
+    catalog: null,
+    activeSnippet: "python",
+    currentView: "overview",
+  };
+
+  const VIEW_META = {
+    overview: ["Overview", "Free capacity at a glance."],
+    setup: ["Setup", "Connect providers and configure this router."],
+    guide: ["Guide", "Run, configure, test, and integrate."],
+    providers: ["Providers", "Quota, health, models, and live probes."],
+    playground: ["Playground", "Test routing before changing your app."],
+    usage: ["Usage & traces", "Inspect requests and fallback chains."],
+    catalog: ["Catalog review", "Review upstream model changes safely."],
+  };
+
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+  const esc = (value) =>
+    String(value ?? "").replace(
+      /[&<>"']/g,
+      (char) =>
+        ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        })[char],
+    );
+  const fmt = (value) => new Intl.NumberFormat().format(Number(value || 0));
+  const pct = (value) =>
+    Math.max(0, Math.min(100, Math.round(Number(value || 0) * 100)));
+
+  function toast(message, tone = "neutral") {
+    const host = $("#toastHost");
+    if (!host) return;
+    const node = document.createElement("div");
+    node.className = `toast toast-${tone}`;
+    node.textContent = message;
+    host.appendChild(node);
+    requestAnimationFrame(() => node.classList.add("show"));
+    window.setTimeout(() => {
+      node.classList.remove("show");
+      window.setTimeout(() => node.remove(), 250);
+    }, 2300);
+  }
+
+  async function copyText(text, successMessage = "Copied") {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(successMessage, "good");
+      return;
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+      toast(successMessage, "good");
     }
   }
-  return '<div class="setup-requirement"><div><strong>'+esc(req.label)+'</strong><span>'+esc(req.key)+'</span></div><div class="setup-actions">'+status+control+'</div></div>';
-}
-function wireSetupActions(){
-  $$('.setup-save').forEach(btn=>btn.onclick=async()=>{
-    const key=btn.dataset.key;const input=document.querySelector('[data-setup-input="'+CSS.escape(key)+'"]');
-    const value=input?.value?.trim();if(!value)return;
-    const old=btn.textContent;btn.textContent='Saving…';btn.disabled=true;
-    try{await api('/api/setup/value',{method:'POST',body:JSON.stringify({key,value})});if(input)input.value='';await refresh()}
-    catch(e){btn.textContent='Failed';setTimeout(()=>btn.textContent=old,1400)}
-    finally{btn.disabled=false}
-  });
-  $$('.setup-remove').forEach(btn=>btn.onclick=async()=>{
-    const key=btn.dataset.key;const old=btn.textContent;btn.textContent='Removing…';btn.disabled=true;
-    try{await api('/api/setup/value/'+encodeURIComponent(key),{method:'DELETE'});await refresh()}
-    catch(e){btn.textContent='Failed';setTimeout(()=>btn.textContent=old,1400)}
-    finally{btn.disabled=false}
-  });
-}
-function renderSetup(){
-  const s=state.setup||{};const total=Math.max(1,s.providers_total||1);const readiness=Math.round(((s.providers_ready||0)/total)*100);
-  $('#setupReadiness').innerHTML='<div class="readiness"><div class="readiness-number">'+readiness+'%</div><div><strong>'+(s.providers_ready||0)+' of '+(s.providers_total||0)+' providers ready</strong><div class="sub">'+(s.persistent_ready||0)+' persistent-free pools · '+(s.no_key_ready||0)+' no-key/optional-key pools</div></div></div><div class="readiness-bar"><i style="width:'+readiness+'%"></i></div><div class="setup-flags"><span class="badge '+(s.transport==='bifrost'?'good':'')+'">transport: '+esc(s.transport||'direct')+'</span><span class="badge '+(s.promo_enabled?'warn':'')+'">promos: '+(s.promo_enabled?'on':'off')+'</span><span class="badge '+(s.trial_enabled?'warn':'')+'">trials: '+(s.trial_enabled?'on':'off')+'</span><span class="badge">'+esc(s.mode||'local-platform')+'</span></div>';
-  const providers=s.provider_setup||[];
-  const rows=providers.filter(p=>p.requirements?.length||p.no_key_required).map(p=>{
-    const reqs=(p.requirements||[]).map(req=>setupRequirementRow(p,req,Boolean(s.writable_setup))).join('');
-    const ready=p.ready?'<span class="badge good">ready</span>':'<span class="badge warn">needs setup</span>';
-    const noKey=p.no_key_required?'<span class="badge">no key required</span>':'';
-    return '<div class="setup-provider"><div class="setup-provider-head"><div><strong>'+esc(p.name)+'</strong><span>'+esc(p.tier)+'</span></div><div class="badges">'+ready+noKey+'</div></div>'+reqs+'<div class="provider-links">'+(p.signup_url?'<a href="'+esc(p.signup_url)+'" target="_blank" rel="noreferrer">Get key</a>':'')+(p.docs_url?'<a href="'+esc(p.docs_url)+'" target="_blank" rel="noreferrer">Docs</a>':'')+'</div></div>';
-  });
-  $('#setupMissing').innerHTML=rows.join('')||'<div class="success-box">No provider configuration is required.</div>';
-  if(!s.writable_setup){
-    $('#setupMissing').insertAdjacentHTML('afterbegin','<div class="setup-warning">Browser credential writes are disabled in hosted/Vercel mode. Configure provider keys as deployment environment variables.</div>');
+
+  async function api(path, options = {}) {
+    const response = await fetch(path, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      },
+    });
+
+    const text = await response.text();
+    let payload = null;
+    if (text) {
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        payload = text;
+      }
+    }
+
+    if (!response.ok) {
+      const detail =
+        payload && typeof payload === "object"
+          ? payload.detail || payload.message || JSON.stringify(payload)
+          : payload || response.statusText;
+      throw new Error(detail);
+    }
+
+    return payload;
   }
-  wireSetupActions();renderSnippet();
-}
-function renderSnippet(){const code=state.snippets?.snippets?.[state.activeSnippet]||'Loading…';$('#snippetCode').textContent=code;$$('.snippet-tab').forEach(b=>b.classList.toggle('active',b.dataset.snippet===state.activeSnippet))}
-function renderProviders(){const q=$('#providerSearch').value.toLowerCase();const tier=$('#tierFilter').value;const rows=state.providers.filter(p=>(tier==='all'||p.tier===tier)&&(`${p.name} ${p.id} ${p.models.map(m=>m.id).join(' ')}`).toLowerCase().includes(q));$('#providerGrid').innerHTML=rows.map(p=>{const cert=p.certification?.state||'unknown';const certClass=cert==='active'?'good':cert==='quarantine'?'bad':cert==='retry_later'?'warn':'';return `<article class="provider-card"><div class="provider-top"><div><h3>${esc(p.name)}</h3><div class="sub">${esc(p.id)}</div></div><div class="sub">${p.configured?'configured':'needs key'}</div></div><div class="badges"><span class="badge ${p.tier==='persistent_free'?'good':'warn'}">${esc(p.tier)}</span><span class="badge ${certClass}">${esc(cert)}</span><span class="badge">${pct(p.runtime?.headroom??0)}% headroom</span></div><div class="models">${p.models.slice(0,5).map(m=>esc(m.label||m.id)).join('<br>')}${p.models.length>5?`<br>+${p.models.length-5} more`:''}</div><div class="provider-links">${p.signup_url?`<a href="${esc(p.signup_url)}" target="_blank" rel="noreferrer">Signup</a>`:''}${p.docs_url?`<a href="${esc(p.docs_url)}" target="_blank" rel="noreferrer">Docs</a>`:''}</div><div class="provider-telemetry">${p.runtime?.provider_quota?.credit_limit_remaining!==undefined?'<span>credit remaining: '+esc(p.runtime.provider_quota.credit_limit_remaining)+'</span>':''}${p.runtime?.provider_quota?.credit_usage_daily!==undefined?'<span>daily credit usage: '+esc(p.runtime.provider_quota.credit_usage_daily)+'</span>':''}</div><div class="actions">${p.id==='openrouter'?'<button class="ghost quota-refresh" data-provider="'+esc(p.id)+'">Refresh quota</button>':''}<button class="ghost certify" data-provider="${esc(p.id)}">Probe</button></div></article>`}).join('');$('.certify').forEach(b=>b.onclick=()=>certify(b.dataset.provider,b));$('.quota-refresh').forEach(b=>b.onclick=()=>refreshQuota(b.dataset.provider,b))
-async function refreshQuota(id,btn){
-  const old=btn.textContent;btn.textContent='Refreshing…';btn.disabled=true;
-  try{await api('/api/providers/'+encodeURIComponent(id)+'/quota/refresh',{method:'POST'});btn.textContent='Updated';await refresh()}
-  catch(e){btn.textContent='Unavailable'}
-  finally{setTimeout(()=>{btn.textContent=old;btn.disabled=false},1400)}
-}
-async function certify(id,btn){const old=btn.textContent;btn.textContent='Probing…';btn.disabled=true;try{const r=await api(`/api/providers/${encodeURIComponent(id)}/certify`,{method:'POST'});btn.textContent=r.ok?'Active':r.state;await refresh()}catch(e){btn.textContent='Failed'}finally{setTimeout(()=>{btn.textContent=old;btn.disabled=false},1200)}}
-function renderCatalog(){
-  const r=state.catalog||{};
-  if(!r.available){
-    $('#catalogStats').innerHTML=stat('Report','Not generated','run discovery + reconciliation')+stat('Auto promotion','Off','review required')+stat('Source','free-coding-models','safe text parse')+stat('Routing impact','None','until registry edit');
-    $('#catalogStatus').textContent=r.message||'No reconciliation report.';
-    $('#catalogChanges').innerHTML='<div class="setup-note">Run python scripts/fcm_discovery.py and python scripts/reconcile_fcm.py on the router host to populate this review queue.</div>';
-    return;
+
+  function setView(view) {
+    if (!VIEW_META[view]) return;
+    state.currentView = view;
+    $$(".view").forEach((node) => node.classList.toggle("active", node.id === view));
+    $$(".nav").forEach((node) =>
+      node.classList.toggle("active", node.dataset.view === view),
+    );
+    const [title, subtitle] = VIEW_META[view];
+    $("#viewTitle").textContent = title;
+    $("#viewSubtitle").textContent = subtitle;
+    history.replaceState(null, "", `#${view}`);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
-  const providers=r.providers||{};const changed=Object.entries(providers).filter(([,v])=>(v.candidate_additions?.length||0)+(v.missing_upstream?.length||0)>0);
-  $('#catalogStats').innerHTML=stat('New candidates',fmt(r.candidate_additions),'not routable yet')+stat('Missing upstream',fmt(r.missing_upstream),'review for retirement')+stat('Providers changed',changed.length,'need human review')+stat('Auto promotion','Off','safe by design');
-  $('#catalogStatus').textContent='Review-only diff. No item shown here can enter free/auto until config/providers.yaml is explicitly updated.';
-  $('#catalogChanges').innerHTML=changed.length?changed.map(([id,v])=>{
-    const adds=(v.candidate_additions||[]).map(x=>'<span class="catalog-chip add">+ '+esc(x)+'</span>').join('');
-    const removes=(v.missing_upstream||[]).map(x=>'<span class="catalog-chip remove">− '+esc(x)+'</span>').join('');
-    return '<div class="catalog-provider"><div class="catalog-provider-head"><strong>'+esc(id)+'</strong><span>'+fmt(v.reviewed_count)+' reviewed / '+fmt(v.upstream_count)+' upstream</span></div><div class="catalog-chips">'+adds+removes+'</div></div>';
-  }).join(''):'<div class="success-box">Reviewed registry and upstream snapshot are aligned.</div>';
-}
-function renderUsage(summary){const t=summary.totals||{};$('#usageStats').innerHTML=stat('Requests',fmt(t.requests),'last 24 hours')+stat('Successes',fmt(t.successes),t.requests?`${Math.round((t.successes/t.requests)*100)}% success`:'—')+stat('Tokens',fmt(t.tokens),'reported by providers')+stat('Avg latency',t.avg_latency_ms?`${Math.round(t.avg_latency_ms)} ms`:'—','successful + failed');$('#usageTable').innerHTML=table(state.usage,true);$$('.trace-link').forEach(b=>b.onclick=()=>loadTrace(b.dataset.request))}
-async function loadTrace(requestId){$('#traceId').textContent=requestId;$('#traceDetail').innerHTML='<div class="sub">Loading trace…</div>';try{const r=await api(`/api/usage/trace/${encodeURIComponent(requestId)}`);$('#traceDetail').innerHTML=r.events.map((e,i)=>`<div class="trace-step ${e.success?'trace-ok':'trace-fail'}"><div class="trace-index">${i+1}</div><div><strong>${esc(e.provider_id)} / ${esc(e.model_id)}</strong><div class="sub">${e.success?'success':`failed · ${esc(e.status_code||'error')}`} · ${e.latency_ms?Math.round(e.latency_ms)+' ms':'no latency'} · ${fmt(e.total_tokens)} tokens</div>${e.error?`<div class="trace-error">${esc(e.error)}</div>`:''}</div></div>`).join('')}catch(e){$('#traceDetail').innerHTML=`<div class="err">${esc(e.message)}</div>`}}
-async function refresh(){try{const [health,p,usage,summary,setup,snippets,catalog]=await Promise.all([api('/health'),api('/api/providers'),api('/api/usage/recent?limit=100'),api('/api/usage/summary?hours=24'),api('/api/setup/status'),api('/api/setup/snippets'),api('/api/catalog/reconciliation')]);state.health=health;state.providers=p.providers;state.usage=usage.events;state.setup=setup;state.snippets=snippets;state.catalog=catalog;$('#healthDot').style.background='#63d9a5';$('#healthLabel').textContent=`${health.configured_providers}/${health.providers} providers configured`;renderOverview();renderSetup();renderProviders();renderUsage(summary);renderCatalog()}catch(e){$('#healthDot').style.background='#ff7b8b';$('#healthLabel').textContent='Router unavailable'}}
-$('#providerSearch').oninput=renderProviders;$('#tierFilter').onchange=renderProviders;$('#refreshBtn').onclick=refresh;
-$('#baseUrl').textContent=location.origin+'/v1';$('#copyBase').onclick=()=>navigator.clipboard.writeText(location.origin+'/v1');
-$$('.snippet-tab').forEach(b=>b.onclick=()=>{state.activeSnippet=b.dataset.snippet;renderSnippet()});$('#copySnippet').onclick=()=>navigator.clipboard.writeText($('#snippetCode').textContent);
-function playgroundRequest(){const messages=[];if($('#systemPrompt').value.trim())messages.push({role:'system',content:$('#systemPrompt').value.trim()});messages.push({role:'user',content:$('#userPrompt').value});return {model:$('#playModel').value,messages,stream:false,temperature:Number($('#temperature').value),max_tokens:Number($('#maxTokens').value)}}
-$('#previewRoute').onclick=async()=>{const box=$('#routePreview');box.innerHTML='<div class="sub">Scoring candidates…</div>';try{const r=await api('/api/route/preview',{method:'POST',body:JSON.stringify(playgroundRequest())});box.innerHTML=r.candidates.slice(0,6).map((c,i)=>`<div class="route-chip"><div><span>${i+1}. ${esc(c.provider_id)}/${esc(c.model_id)}</span><small>${esc(c.reason)}</small></div><b>${c.score.toFixed(3)}</b></div>`).join('')||'<div class="sub">No eligible candidate. Configure API keys or choose another pool.</div>'}catch(e){box.innerHTML=`<div class="err">${esc(e.message)}</div>`}};
-$('#sendPrompt').onclick=async()=>{const out=$('#playOutput'),meta=$('#routeMeta'),btn=$('#sendPrompt');out.textContent='Routing…';meta.textContent='';btn.disabled=true;try{const r=await fetch('/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(playgroundRequest())});const data=await r.json();if(!r.ok)throw new Error(data.detail||JSON.stringify(data));const result=data.choices?.[0]?.message?.content??JSON.stringify(data,null,2);out.textContent=typeof result==='string'?result:JSON.stringify(result,null,2);meta.textContent=`${r.headers.get('x-router-provider')||data.router?.provider} / ${r.headers.get('x-router-model')||data.router?.model} · fallback ${r.headers.get('x-router-fallback-count')||0}`;await refresh();if(data.router?.request_id)loadTrace(data.router.request_id)}catch(e){out.textContent=e.message;meta.textContent='Request failed'}finally{btn.disabled=false}};
-refresh();
+
+  function stat(label, value, detail = "") {
+    return `
+      <div class="stat">
+        <span>${esc(label)}</span>
+        <strong>${esc(value)}</strong>
+        <div class="sub">${esc(detail)}</div>
+      </div>
+    `;
+  }
+
+  function renderRequestTable(events, withTrace = true) {
+    if (!events.length) {
+      return '<div class="empty-state">No routed requests yet.</div>';
+    }
+    return `
+      <table>
+        <thead>
+          <tr>
+            <th>Provider</th>
+            <th>Model</th>
+            <th>Status</th>
+            <th>Latency</th>
+            ${withTrace ? "<th>Trace</th>" : ""}
+          </tr>
+        </thead>
+        <tbody>
+          ${events
+            .map(
+              (event) => `
+              <tr>
+                <td>${esc(event.provider_id)}</td>
+                <td>${esc(event.model_id)}</td>
+                <td class="${event.success ? "ok" : "err"}">
+                  ${event.success ? "OK" : esc(event.status_code || "ERR")}
+                </td>
+                <td>${event.latency_ms ? `${Math.round(event.latency_ms)} ms` : "—"}</td>
+                ${withTrace
+                  ? `<td>${
+                      event.request_id
+                        ? `<button type="button" class="trace-link" data-request="${esc(event.request_id)}">${esc(event.request_id.slice(-8))}</button>`
+                        : "—"
+                    }</td>`
+                  : ""}
+              </tr>
+            `,
+            )
+            .join("")}
+        </tbody>
+      </table>
+    `;
+  }
+
+  function renderOverview() {
+    const providers = state.providers;
+    const configured = providers.filter((provider) => provider.configured);
+    const persistent = configured.filter(
+      (provider) => provider.tier === "persistent_free",
+    );
+    const healthy = configured.filter((provider) =>
+      ["active", "unknown"].includes(provider.certification?.state || "unknown"),
+    );
+    const models = providers.reduce(
+      (total, provider) => total + (provider.models?.length || 0),
+      0,
+    );
+
+    $("#stats").innerHTML =
+      stat("Connected pools", configured.length, `${persistent.length} recurring-free`) +
+      stat("Reviewed models", models, "eligible catalog entries") +
+      stat(
+        "Requests / 24h",
+        state.usage.length,
+        `${state.usage.filter((event) => event.success).length} successful`,
+      ) +
+      stat("Healthy pools", healthy.length, "configured and available");
+
+    const capacityProviders = (configured.length ? configured : providers).slice(0, 10);
+    $("#capacityList").innerHTML =
+      capacityProviders
+        .map((provider) => {
+          const headroom = provider.runtime?.headroom ?? 0.65;
+          return `
+            <div class="capacity-row">
+              <div>
+                <strong>${esc(provider.name)}</strong>
+                <span>${esc(provider.tier)}</span>
+              </div>
+              <div class="meter"><i style="width:${pct(headroom)}%"></i></div>
+              <b>${pct(headroom)}%</b>
+            </div>
+          `;
+        })
+        .join("") ||
+      '<div class="empty-state">Connect a provider to see capacity.</div>';
+
+    $("#recentMini").innerHTML = renderRequestTable(state.usage.slice(0, 7), false);
+  }
+
+  function setupRequirementRow(requirement, writable) {
+    const source = requirement.source || "missing";
+    const configured = Boolean(requirement.configured);
+    const status = configured
+      ? `<span class="badge good">${esc(source)}</span>`
+      : '<span class="badge warn">missing</span>';
+
+    let control = "";
+    if (writable && source !== "environment") {
+      if (configured) {
+        control = `
+          <button type="button" class="ghost setup-remove" data-key="${esc(requirement.key)}">
+            Remove local
+          </button>
+        `;
+      } else {
+        control = `
+          <div class="setup-input">
+            <input
+              type="${requirement.secret ? "password" : "text"}"
+              autocomplete="off"
+              placeholder="${esc(requirement.label)}"
+              data-setup-input="${esc(requirement.key)}"
+            />
+            <button type="button" class="primary setup-save" data-key="${esc(requirement.key)}">
+              Save
+            </button>
+          </div>
+        `;
+      }
+    }
+
+    return `
+      <div class="setup-requirement">
+        <div>
+          <strong>${esc(requirement.label)}${requirement.optional ? " (optional)" : ""}</strong>
+          <span>${esc(requirement.key)}</span>
+        </div>
+        <div class="setup-actions">${status}${control}</div>
+      </div>
+    `;
+  }
+
+  function renderSetup() {
+    const setup = state.setup || {};
+    const total = Math.max(1, setup.providers_total || 1);
+    const readiness = Math.round(((setup.providers_ready || 0) / total) * 100);
+
+    $("#setupReadiness").innerHTML = `
+      <div class="readiness">
+        <div class="readiness-number">${readiness}%</div>
+        <div>
+          <strong>${setup.providers_ready || 0} of ${setup.providers_total || 0} providers ready</strong>
+          <div class="sub">
+            ${setup.persistent_ready || 0} persistent-free pools ·
+            ${setup.no_key_ready || 0} no-key/optional-key pools
+          </div>
+        </div>
+      </div>
+      <div class="readiness-bar"><i style="width:${readiness}%"></i></div>
+      <div class="setup-flags">
+        <span class="badge">transport: ${esc(setup.transport || "direct")}</span>
+        <span class="badge ${setup.promo_enabled ? "warn" : ""}">
+          promos: ${setup.promo_enabled ? "on" : "off"}
+        </span>
+        <span class="badge ${setup.trial_enabled ? "warn" : ""}">
+          trials: ${setup.trial_enabled ? "on" : "off"}
+        </span>
+        <span class="badge">${esc(setup.mode || "local-platform")}</span>
+      </div>
+    `;
+
+    const providers = setup.provider_setup || [];
+    const rows = providers
+      .filter((provider) => provider.requirements?.length || provider.no_key_required)
+      .map((provider) => {
+        const requirements = (provider.requirements || [])
+          .map((requirement) =>
+            setupRequirementRow(requirement, Boolean(setup.writable_setup)),
+          )
+          .join("");
+        return `
+          <article class="setup-provider">
+            <div class="setup-provider-head">
+              <div>
+                <strong>${esc(provider.name)}</strong>
+                <span>${esc(provider.tier)}</span>
+              </div>
+              <div class="badges">
+                <span class="badge ${provider.ready ? "good" : "warn"}">
+                  ${provider.ready ? "ready" : "needs setup"}
+                </span>
+                ${provider.no_key_required ? '<span class="badge">no key required</span>' : ""}
+              </div>
+            </div>
+            ${requirements || '<div class="sub">No credentials required.</div>'}
+            <div class="provider-links">
+              ${provider.signup_url ? `<a href="${esc(provider.signup_url)}" target="_blank" rel="noreferrer">Get key</a>` : ""}
+              ${provider.docs_url ? `<a href="${esc(provider.docs_url)}" target="_blank" rel="noreferrer">Docs</a>` : ""}
+            </div>
+          </article>
+        `;
+      });
+
+    $("#setupMissing").innerHTML =
+      rows.join("") ||
+      '<div class="success-box">No provider configuration is required.</div>';
+
+    if (!setup.writable_setup) {
+      $("#setupMissing").insertAdjacentHTML(
+        "afterbegin",
+        '<div class="setup-warning">Credential writes are disabled in hosted mode. Configure provider secrets as deployment environment variables.</div>',
+      );
+    }
+
+    renderSnippet();
+  }
+
+  function renderSnippet() {
+    const code =
+      state.snippets?.snippets?.[state.activeSnippet] ||
+      "Start the local router to generate a client snippet.";
+    $("#snippetCode").textContent = code;
+    $$(".snippet-tab").forEach((button) =>
+      button.classList.toggle(
+        "active",
+        button.dataset.snippet === state.activeSnippet,
+      ),
+    );
+  }
+
+  function renderProviders() {
+    const query = ($("#providerSearch")?.value || "").toLowerCase();
+    const tier = $("#tierFilter")?.value || "all";
+
+    const providers = state.providers.filter((provider) => {
+      const searchable = `${provider.name} ${provider.id} ${(provider.models || [])
+        .map((model) => model.id)
+        .join(" ")}`.toLowerCase();
+      return (tier === "all" || provider.tier === tier) && searchable.includes(query);
+    });
+
+    $("#providerGrid").innerHTML =
+      providers
+        .map((provider) => {
+          const certification = provider.certification?.state || "unknown";
+          const certificationClass =
+            certification === "active"
+              ? "good"
+              : certification === "quarantine"
+                ? "bad"
+                : certification === "retry_later"
+                  ? "warn"
+                  : "";
+          const telemetry = provider.runtime?.provider_quota || {};
+
+          return `
+            <article class="provider-card interactive-card">
+              <div class="provider-top">
+                <div>
+                  <h3>${esc(provider.name)}</h3>
+                  <div class="sub">${esc(provider.id)}</div>
+                </div>
+                <span class="connection-dot ${provider.configured ? "connected" : ""}" title="${provider.configured ? "Configured" : "Needs key"}"></span>
+              </div>
+              <div class="badges">
+                <span class="badge ${provider.tier === "persistent_free" ? "good" : "warn"}">${esc(provider.tier)}</span>
+                <span class="badge ${certificationClass}">${esc(certification)}</span>
+                <span class="badge">${pct(provider.runtime?.headroom ?? 0)}% headroom</span>
+              </div>
+              <div class="models">
+                ${(provider.models || [])
+                  .slice(0, 5)
+                  .map(
+                    (model) =>
+                      `<div><span>${esc(model.label || model.id)}</span><small>${model.current === false ? "stale" : "current"}</small></div>`,
+                  )
+                  .join("")}
+                ${provider.models?.length > 5 ? `<div class="sub">+${provider.models.length - 5} more</div>` : ""}
+              </div>
+              <div class="provider-links">
+                ${provider.signup_url ? `<a href="${esc(provider.signup_url)}" target="_blank" rel="noreferrer">Signup</a>` : ""}
+                ${provider.docs_url ? `<a href="${esc(provider.docs_url)}" target="_blank" rel="noreferrer">Docs</a>` : ""}
+              </div>
+              <div class="provider-telemetry">
+                ${telemetry.credit_limit_remaining !== undefined ? `<span>credit remaining: ${esc(telemetry.credit_limit_remaining)}</span>` : ""}
+                ${telemetry.credit_usage_daily !== undefined ? `<span>daily usage: ${esc(telemetry.credit_usage_daily)}</span>` : ""}
+              </div>
+              <div class="actions">
+                ${provider.id === "openrouter" ? `<button type="button" class="ghost quota-refresh" data-provider="${esc(provider.id)}">Refresh quota</button>` : ""}
+                <button type="button" class="ghost certify" data-provider="${esc(provider.id)}">Probe</button>
+              </div>
+            </article>
+          `;
+        })
+        .join("") || '<div class="empty-state">No providers match this filter.</div>';
+  }
+
+  function renderCatalog() {
+    const report = state.catalog || {};
+
+    if (!report.available) {
+      $("#catalogStats").innerHTML =
+        stat("Report", "Not generated", "run discovery + reconciliation") +
+        stat("Auto promotion", "Off", "review required") +
+        stat("Source", "free-coding-models", "safe text parse") +
+        stat("Routing impact", "None", "until registry edit");
+      $("#catalogStatus").textContent =
+        report.message || "No reconciliation report yet.";
+      $("#catalogChanges").innerHTML =
+        '<div class="setup-note">Run python scripts/fcm_discovery.py and python scripts/reconcile_fcm.py on the router host to populate this queue.</div>';
+      return;
+    }
+
+    const providers = report.providers || {};
+    const changed = Object.entries(providers).filter(
+      ([, value]) =>
+        (value.candidate_additions?.length || 0) +
+          (value.missing_upstream?.length || 0) >
+        0,
+    );
+
+    $("#catalogStats").innerHTML =
+      stat("New candidates", fmt(report.candidate_additions), "not routable yet") +
+      stat("Missing upstream", fmt(report.missing_upstream), "review for retirement") +
+      stat("Providers changed", changed.length, "need human review") +
+      stat("Auto promotion", "Off", "safe by design");
+
+    $("#catalogStatus").textContent =
+      "Review-only diff. Nothing enters free/auto until the registry is explicitly updated.";
+
+    $("#catalogChanges").innerHTML = changed.length
+      ? changed
+          .map(([id, value]) => {
+            const additions = (value.candidate_additions || [])
+              .map((model) => `<span class="catalog-chip add">+ ${esc(model)}</span>`)
+              .join("");
+            const removals = (value.missing_upstream || [])
+              .map((model) => `<span class="catalog-chip remove">− ${esc(model)}</span>`)
+              .join("");
+            return `
+              <div class="catalog-provider">
+                <div class="catalog-provider-head">
+                  <strong>${esc(id)}</strong>
+                  <span>${fmt(value.reviewed_count)} reviewed / ${fmt(value.upstream_count)} upstream</span>
+                </div>
+                <div class="catalog-chips">${additions}${removals}</div>
+              </div>
+            `;
+          })
+          .join("")
+      : '<div class="success-box">Reviewed registry and upstream snapshot are aligned.</div>';
+  }
+
+  function renderUsage(summary) {
+    const totals = summary.totals || {};
+    $("#usageStats").innerHTML =
+      stat("Requests", fmt(totals.requests), "last 24 hours") +
+      stat(
+        "Successes",
+        fmt(totals.successes),
+        totals.requests
+          ? `${Math.round((totals.successes / totals.requests) * 100)}% success`
+          : "—",
+      ) +
+      stat("Tokens", fmt(totals.tokens), "reported by providers") +
+      stat(
+        "Avg latency",
+        totals.avg_latency_ms ? `${Math.round(totals.avg_latency_ms)} ms` : "—",
+        "successful + failed",
+      );
+    $("#usageTable").innerHTML = renderRequestTable(state.usage, true);
+  }
+
+  function playgroundRequest() {
+    const messages = [];
+    const system = $("#systemPrompt").value.trim();
+    if (system) messages.push({ role: "system", content: system });
+    messages.push({ role: "user", content: $("#userPrompt").value });
+    return {
+      model: $("#playModel").value,
+      messages,
+      stream: false,
+      temperature: Number($("#temperature").value),
+      max_tokens: Number($("#maxTokens").value),
+    };
+  }
+
+  async function refreshQuota(providerId, button) {
+    const original = button.textContent;
+    button.textContent = "Refreshing…";
+    button.disabled = true;
+    try {
+      await api(`/api/providers/${encodeURIComponent(providerId)}/quota/refresh`, {
+        method: "POST",
+      });
+      toast("Quota telemetry updated", "good");
+      await refresh();
+    } catch (error) {
+      toast(error.message || "Quota refresh unavailable", "bad");
+    } finally {
+      button.textContent = original;
+      button.disabled = false;
+    }
+  }
+
+  async function certify(providerId, button) {
+    const original = button.textContent;
+    button.textContent = "Probing…";
+    button.disabled = true;
+    try {
+      const result = await api(
+        `/api/providers/${encodeURIComponent(providerId)}/certify`,
+        { method: "POST" },
+      );
+      toast(
+        result.ok ? `${providerId} is active` : `${providerId}: ${result.state}`,
+        result.ok ? "good" : "neutral",
+      );
+      await refresh();
+    } catch (error) {
+      toast(error.message || "Probe failed", "bad");
+    } finally {
+      button.textContent = original;
+      button.disabled = false;
+    }
+  }
+
+  async function loadTrace(requestId) {
+    $("#traceId").textContent = requestId;
+    $("#traceDetail").innerHTML = '<div class="sub">Loading trace…</div>';
+    try {
+      const result = await api(
+        `/api/usage/trace/${encodeURIComponent(requestId)}`,
+      );
+      $("#traceDetail").innerHTML = result.events
+        .map(
+          (event, index) => `
+            <div class="trace-step ${event.success ? "trace-ok" : "trace-fail"}">
+              <div class="trace-index">${index + 1}</div>
+              <div>
+                <strong>${esc(event.provider_id)} / ${esc(event.model_id)}</strong>
+                <div class="sub">
+                  ${event.success ? "success" : `failed · ${esc(event.status_code || "error")}`}
+                  · ${event.latency_ms ? `${Math.round(event.latency_ms)} ms` : "no latency"}
+                  · ${fmt(event.total_tokens)} tokens
+                </div>
+                ${event.error ? `<div class="trace-error">${esc(event.error)}</div>` : ""}
+              </div>
+            </div>
+          `,
+        )
+        .join("");
+    } catch (error) {
+      $("#traceDetail").innerHTML = `<div class="err">${esc(error.message)}</div>`;
+    }
+  }
+
+  async function refresh() {
+    $("#refreshBtn").classList.add("is-loading");
+    try {
+      const results = await Promise.allSettled([
+        api("/health"),
+        api("/api/providers"),
+        api("/api/usage/recent?limit=100"),
+        api("/api/usage/summary?hours=24"),
+        api("/api/setup/status"),
+        api("/api/setup/snippets"),
+        api("/api/catalog/reconciliation"),
+      ]);
+
+      const [health, providers, usage, summary, setup, snippets, catalog] =
+        results.map((result) =>
+          result.status === "fulfilled" ? result.value : null,
+        );
+
+      if (!health || !providers) {
+        throw new Error("Router core endpoints are unavailable");
+      }
+
+      state.health = health;
+      state.providers = providers.providers || [];
+      state.usage = usage?.events || [];
+      state.setup = setup || {};
+      state.snippets = snippets || {};
+      state.catalog = catalog || { available: false };
+
+      $("#healthDot").classList.add("online");
+      $("#healthLabel").textContent =
+        `${health.configured_providers}/${health.providers} providers configured`;
+
+      renderOverview();
+      renderSetup();
+      renderProviders();
+      renderUsage(summary || { totals: {} });
+      renderCatalog();
+    } catch (error) {
+      $("#healthDot").classList.remove("online");
+      $("#healthLabel").textContent = "Router unavailable";
+      toast(error.message || "Could not refresh router state", "bad");
+    } finally {
+      $("#refreshBtn").classList.remove("is-loading");
+    }
+  }
+
+  function wireStaticActions() {
+    document.addEventListener("click", async (event) => {
+      const nav = event.target.closest(".nav");
+      if (nav) {
+        setView(nav.dataset.view);
+        return;
+      }
+
+      const save = event.target.closest(".setup-save");
+      if (save) {
+        const key = save.dataset.key;
+        const input = document.querySelector(
+          `[data-setup-input="${CSS.escape(key)}"]`,
+        );
+        const value = input?.value?.trim();
+        if (!value) {
+          toast("Enter a value first", "neutral");
+          return;
+        }
+        const original = save.textContent;
+        save.textContent = "Saving…";
+        save.disabled = true;
+        try {
+          await api("/api/setup/value", {
+            method: "POST",
+            body: JSON.stringify({ key, value }),
+          });
+          input.value = "";
+          toast("Provider setting saved", "good");
+          await refresh();
+        } catch (error) {
+          toast(error.message || "Could not save setting", "bad");
+        } finally {
+          save.textContent = original;
+          save.disabled = false;
+        }
+        return;
+      }
+
+      const remove = event.target.closest(".setup-remove");
+      if (remove) {
+        const key = remove.dataset.key;
+        const original = remove.textContent;
+        remove.textContent = "Removing…";
+        remove.disabled = true;
+        try {
+          await api(`/api/setup/value/${encodeURIComponent(key)}`, {
+            method: "DELETE",
+          });
+          toast("Local value removed", "good");
+          await refresh();
+        } catch (error) {
+          toast(error.message || "Could not remove setting", "bad");
+        } finally {
+          remove.textContent = original;
+          remove.disabled = false;
+        }
+        return;
+      }
+
+      const probe = event.target.closest(".certify");
+      if (probe) {
+        await certify(probe.dataset.provider, probe);
+        return;
+      }
+
+      const quotaButton = event.target.closest(".quota-refresh");
+      if (quotaButton) {
+        await refreshQuota(quotaButton.dataset.provider, quotaButton);
+        return;
+      }
+
+      const trace = event.target.closest(".trace-link");
+      if (trace) {
+        await loadTrace(trace.dataset.request);
+        return;
+      }
+    });
+
+    $("#refreshBtn").addEventListener("click", refresh);
+    $("#providerSearch").addEventListener("input", renderProviders);
+    $("#tierFilter").addEventListener("change", renderProviders);
+
+    $("#copyBase").addEventListener("click", () =>
+      copyText(`${location.origin}/v1`, "Base URL copied"),
+    );
+
+    $$(".snippet-tab").forEach((button) =>
+      button.addEventListener("click", () => {
+        state.activeSnippet = button.dataset.snippet;
+        renderSnippet();
+      }),
+    );
+
+    $("#copySnippet").addEventListener("click", () =>
+      copyText($("#snippetCode").textContent, "Snippet copied"),
+    );
+
+    $("#previewRoute").addEventListener("click", async () => {
+      const box = $("#routePreview");
+      box.innerHTML = '<div class="sub">Scoring candidates…</div>';
+      try {
+        const result = await api("/api/route/preview", {
+          method: "POST",
+          body: JSON.stringify(playgroundRequest()),
+        });
+        box.innerHTML =
+          (result.candidates || [])
+            .slice(0, 6)
+            .map(
+              (candidate, index) => `
+                <div class="route-chip">
+                  <div>
+                    <span>${index + 1}. ${esc(candidate.provider_id)}/${esc(candidate.model_id)}</span>
+                    <small>${esc(candidate.reason)}</small>
+                  </div>
+                  <b>${Number(candidate.score).toFixed(3)}</b>
+                </div>
+              `,
+            )
+            .join("") ||
+          '<div class="empty-state">No eligible candidate. Add a provider key or choose another pool.</div>';
+      } catch (error) {
+        box.innerHTML = `<div class="err">${esc(error.message)}</div>`;
+      }
+    });
+
+    $("#sendPrompt").addEventListener("click", async () => {
+      const output = $("#playOutput");
+      const meta = $("#routeMeta");
+      const button = $("#sendPrompt");
+      output.textContent = "Routing…";
+      meta.textContent = "";
+      button.disabled = true;
+
+      try {
+        const response = await fetch("/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(playgroundRequest()),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || JSON.stringify(data));
+        }
+
+        const result =
+          data.choices?.[0]?.message?.content ?? JSON.stringify(data, null, 2);
+        output.textContent =
+          typeof result === "string" ? result : JSON.stringify(result, null, 2);
+
+        const provider =
+          response.headers.get("x-router-provider") || data.router?.provider || "router";
+        const model =
+          response.headers.get("x-router-model") || data.router?.model || "unknown";
+        const fallback =
+          response.headers.get("x-router-fallback-count") ||
+          data.router?.fallback_count ||
+          0;
+        meta.textContent = `${provider} / ${model} · fallback ${fallback}`;
+
+        await refresh();
+        if (data.router?.request_id) {
+          await loadTrace(data.router.request_id);
+        }
+      } catch (error) {
+        output.textContent = error.message;
+        meta.textContent = "Request failed";
+        toast(error.message || "Playground request failed", "bad");
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
+  function boot() {
+    $("#baseUrl").textContent = `${location.origin}/v1`;
+    wireStaticActions();
+
+    const initialView = location.hash.replace("#", "");
+    if (VIEW_META[initialView]) {
+      setView(initialView);
+    }
+
+    refresh();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot, { once: true });
+  } else {
+    boot();
+  }
+})();
