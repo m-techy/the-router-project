@@ -34,3 +34,45 @@ def test_promo_requires_opt_in(tmp_path,monkeypatch):
     normal={c.provider_id for c in router.candidates(req,allow_trial=False,allow_promo=False)}
     promo={c.provider_id for c in router.candidates(req,allow_trial=False,allow_promo=True)}
     assert "opencode-zen" not in normal and "opencode-zen" in promo
+
+
+def test_broken_model_does_not_disable_whole_provider(monkeypatch, tmp_path):
+    monkeypatch.setenv("GROQ_API_KEY", "test")
+    registry = ProviderRegistry(ROOT / "config" / "providers.yaml")
+    provider = registry.get("groq")
+    enabled = [m for m in provider.models if m.enabled and m.free]
+    assert len(enabled) >= 2
+    quota = make_quota(tmp_path)
+    router = FreeRouter(registry, quota)
+    quota.record_failure(
+        provider.id,
+        model_id=enabled[0].id,
+        status_code=404,
+        error="model retired",
+    )
+    req = ChatCompletionRequest(messages=[ChatMessage(role="user", content="hello")])
+    candidates = router.candidates(req, allow_trial=False, allow_promo=False)
+    groq_models = {candidate.model_id for candidate in candidates if candidate.provider_id == "groq"}
+    assert enabled[0].id not in groq_models
+    assert enabled[1].id in groq_models
+    assert quota.available(provider)
+
+
+def test_model_runtime_survives_restart(tmp_path):
+    path = tmp_path / "models.db"
+    store = StateStore(path)
+    quota = QuotaManager(store)
+    quota.record_failure(
+        "provider-x",
+        model_id="retired-model",
+        status_code=410,
+        error="gone",
+    )
+    assert not quota.model_available("provider-x", "retired-model")
+    store.close()
+
+    store = StateStore(path)
+    quota = QuotaManager(store)
+    assert not quota.model_available("provider-x", "retired-model")
+    assert quota.model_available("provider-x", "healthy-model")
+    store.close()
