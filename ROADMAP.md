@@ -69,6 +69,15 @@
 - [x] project-key-aware Playground and generated client snippets
 - [x] dashboard interaction contract regression tests
 
+## v0.9 — decision intelligence
+- [ ] Jev typed decision-model integration spike via Vercel AI Gateway for routing and evaluation, not chat generation
+- [ ] classify intent, modality, tool need, complexity, and escalation need in a single decision pass
+- [ ] confidence-aware routing policy with deterministic fallback to the existing router when Jev is unavailable or below threshold
+- [ ] post-response evaluator path for accept / retry / escalate decisions without exposing Jev as a user-facing model
+- [ ] benchmark Jev against the current router for routing accuracy, latency, and cost before enabling it broadly
+- [ ] keep Jev promotional/paid usage isolated from `free/auto`; never consume non-recurring-free capacity without explicit opt-in
+- [ ] expose Jev decision traces and confidence in request diagnostics without leaking prompts, secrets, or provider credentials
+
 ## v1.0 — hosted without sacrificing self-hosting
 - [ ] hosted control-plane UI while preserving the public project site
 - [ ] hosted-safe live events / realtime usage updates
