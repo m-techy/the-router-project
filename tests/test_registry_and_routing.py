@@ -120,3 +120,12 @@ def test_cerebras_starting_credit_is_excluded_from_default_route(tmp_path, monke
 
     assert "cerebras" not in default
     assert "cerebras" in promotional
+
+
+def test_cloudflare_models_fail_closed_until_neuron_quota_is_enforced():
+    registry = ProviderRegistry(ROOT / "config" / "providers.yaml")
+    provider = registry.get("cloudflare-ai")
+
+    assert provider.quota.neurons_per_day == 10_000
+    assert provider.models
+    assert all(not model.enabled for model in provider.models)
