@@ -86,6 +86,7 @@ providers:
         capabilities: {chat: false, streaming: false, vision: true, audio: true, embeddings: true, coding: false}
 
   - id: cloudflare-ai
+    # Disabled in automatic routing until the router can reconcile account-wide neuron usage.
     name: Cloudflare Workers AI
     tier: persistent_free
     env_key: CLOUDFLARE_API_TOKEN
@@ -98,22 +99,27 @@ providers:
     quota: {scope: account, neurons_per_day: 10000, reset_timezone: UTC, reset_hour: 0}
     models:
       - id: "@cf/openai/gpt-oss-20b"
+        enabled: false
         label: GPT OSS 20B
         quality: 0.73
         capabilities: {chat: true, streaming: true, tools: true, json_mode: true, reasoning: true, coding: true}
       - id: "@cf/qwen/qwen3-30b-a3b-fp8"
+        enabled: false
         label: Qwen3 30B
         quality: 0.70
         capabilities: {chat: true, streaming: true, reasoning: true, coding: true}
       - id: "@cf/baai/bge-m3"
+        enabled: false
         label: BGE M3 Embeddings
         quality: 0.82
         capabilities: {chat: false, streaming: false, embeddings: true, coding: false}
       - id: "@cf/qwen/qwen3-embedding-0.6b"
+        enabled: false
         label: Qwen3 Embedding 0.6B
         quality: 0.78
         capabilities: {chat: false, streaming: false, embeddings: true, coding: false}
       - id: "@cf/black-forest-labs/flux-1-schnell"
+        enabled: false
         label: FLUX.1 Schnell
         quality: 0.78
         capabilities: {chat: false, streaming: false, image_generation: true, coding: false}
