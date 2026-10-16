@@ -63,11 +63,39 @@ def request_requirements(request: ChatCompletionRequest) -> set[str]:
     return requirements
 
 
-def usage_from_body(body: dict[str, Any]) -> tuple[int, int, int]:
-    usage = body.get("usage") or {}
+def usage_from_body(
+    body: dict[str, Any],
+    request: ChatCompletionRequest | None = None,
+) -> tuple[int, int, int]:
+    usage = body.get("usage")
+    usage = usage if isinstance(usage, dict) else {}
     prompt = int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
     completion = int(usage.get("completion_tokens") or usage.get("output_tokens") or 0)
-    total = int(usage.get("total_tokens") or (prompt + completion))
+    total = int(usage.get("total_tokens") or 0)
+
+    if total:
+        if not prompt:
+            prompt = max(0, total - completion)
+        if not completion:
+            completion = max(0, total - prompt)
+        return prompt, completion, total
+
+    if request is not None:
+        prompt = prompt or estimate_tokens(request)
+        if not completion:
+            output_chars = 0
+            for choice in body.get("choices") or []:
+                if not isinstance(choice, dict):
+                    continue
+                message = choice.get("message") or {}
+                if isinstance(message, dict):
+                    content = message.get("content")
+                    if content is not None:
+                        output_chars += len(content if isinstance(content, str) else str(content))
+                    output_chars += len(str(message.get("tool_calls") or ""))
+            completion = (output_chars + 3) // 4
+
+    total = total or (prompt + completion)
     return prompt, completion, total
 
 
@@ -303,7 +331,14 @@ class FreeRouter:
                 body, headers = await self._adapter(provider).chat(provider, candidate.model_id, request)
                 latency = (time.perf_counter() - started) * 1000
                 self.quota.reconcile_headers(provider.id, headers)
-                prompt, completion, total = usage_from_body(body)
+                prompt, completion, total = usage_from_body(body, request)
+                usage = body.get("usage")
+                body["usage"] = {
+                    **(usage if isinstance(usage, dict) else {}),
+                    "prompt_tokens": prompt,
+                    "completion_tokens": completion,
+                    "total_tokens": total,
+                }
                 self.quota.record_success(
                     provider.id,
                     model_id=candidate.model_id,
