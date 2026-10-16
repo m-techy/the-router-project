@@ -33,15 +33,16 @@ providers:
 
   - id: cerebras
     name: Cerebras Inference
-    tier: persistent_free
+    tier: promotional
     env_key: CEREBRAS_API_KEY
     base_url: https://api.cerebras.ai/v1
     priority: 1.20
     confidence: high
-    verification: official-rate-limits + free-coding-models-live
+    verification: official-pricing-payg-free-credit
     signup_url: https://cloud.cerebras.ai/
     docs_url: https://inference-docs.cerebras.ai/quickstart
-    quota: {scope: account, source: "recurring free developer tier; model-specific limits"}
+    quota: {scope: account, source: "promotional starting credit only; no recurring free quota verified"}
+    notes: ["Cerebras is pay-as-you-go; its starting credit is promotional and excluded from free/auto."]
     models:
       - id: gpt-oss-120b
         label: GPT OSS 120B
