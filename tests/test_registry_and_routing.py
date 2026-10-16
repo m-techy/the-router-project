@@ -89,3 +89,34 @@ def test_promotional_expiry_fails_closed():
     assert model_is_current(active, now)
     assert not model_is_current(expired, now)
     assert not model_is_current(malformed, now)
+
+
+def test_cerebras_starting_credit_is_excluded_from_default_route(tmp_path, monkeypatch):
+    monkeypatch.setenv("CEREBRAS_API_KEY", "test")
+    router = FreeRouter(
+        ProviderRegistry(ROOT / "config" / "providers.yaml"),
+        make_quota(tmp_path),
+    )
+    request = ChatCompletionRequest(
+        messages=[ChatMessage(role="user", content="hello")],
+    )
+
+    default = {
+        candidate.provider_id
+        for candidate in router.candidates(
+            request,
+            allow_trial=False,
+            allow_promo=False,
+        )
+    }
+    promotional = {
+        candidate.provider_id
+        for candidate in router.candidates(
+            request,
+            allow_trial=False,
+            allow_promo=True,
+        )
+    }
+
+    assert "cerebras" not in default
+    assert "cerebras" in promotional
